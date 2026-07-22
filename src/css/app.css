@@ -1,0 +1,438 @@
+/* ============================================================
+   InovaTrack · Liquid Glass Theme
+   Capa de estilo por encima del tema iOS de Framework7
+   ============================================================ */
+
+:root {
+  /* Paleta de marca */
+  --inova-primary: #5b5bd6;
+  --inova-primary-2: #7c6cf0;
+  --inova-accent: #a78bfa;
+
+  /* Semáforo de estatus */
+  --st-vencido: #ff453a;
+  --st-hoy: #ff9f0a;
+  --st-manana: #ffd60a;
+  --st-tiempo: #30d158;
+  --st-concluido: #0a84ff;
+  --st-espera: #bf5af2;
+
+  /* Superficies glass */
+  --glass-bg: rgba(255, 255, 255, 0.14);
+  --glass-bg-strong: rgba(255, 255, 255, 0.24);
+  --glass-border: rgba(255, 255, 255, 0.28);
+  --glass-shadow: 0 8px 32px rgba(17, 12, 46, 0.18);
+  --glass-blur: 22px;
+
+  /* Framework7 primary override */
+  --f7-theme-color: var(--inova-primary);
+  --f7-theme-color-rgb: 91, 91, 214;
+  --f7-theme-color-shade: #4a4ac2;
+  --f7-theme-color-tint: #7676e0;
+
+  --f7-page-bg-color: transparent;
+  --f7-bars-bg-color: transparent;
+  --f7-bars-bg-image: none;
+  --f7-navbar-bg-color: transparent;
+  --f7-toolbar-bg-color: transparent;
+}
+
+/* ---------- Fondo global degradado (aurora) ---------- */
+:root,
+.framework7-root,
+body {
+  background-color: #f2f1fb;
+}
+
+:root {
+  --aurora-color: #f2f1fb;
+  --aurora-image:
+    radial-gradient(120% 80% at 10% 0%, rgba(124, 108, 240, 0.35) 0%, transparent 55%),
+    radial-gradient(120% 80% at 100% 10%, rgba(167, 139, 250, 0.3) 0%, transparent 55%),
+    radial-gradient(120% 90% at 50% 100%, rgba(91, 91, 214, 0.22) 0%, transparent 60%);
+}
+.dark {
+  --aurora-color: #0b0b13;
+  --aurora-image:
+    radial-gradient(120% 80% at 10% 0%, rgba(124, 108, 240, 0.45) 0%, transparent 55%),
+    radial-gradient(120% 80% at 100% 10%, rgba(167, 139, 250, 0.32) 0%, transparent 55%),
+    radial-gradient(120% 90% at 50% 100%, rgba(91, 91, 214, 0.3) 0%, transparent 60%);
+}
+
+body {
+  background-image: var(--tematica-image, none), var(--aurora-image);
+  background-size: var(--tematica-size, 90px) var(--tematica-size, 90px), auto, auto, auto;
+  background-repeat: repeat, no-repeat, no-repeat, no-repeat;
+  background-attachment: fixed;
+}
+
+.dark body {
+  background-color: #0b0b13;
+  background-image:
+    radial-gradient(120% 80% at 10% 0%, rgba(124, 108, 240, 0.45) 0%, transparent 55%),
+    radial-gradient(120% 80% at 100% 10%, rgba(167, 139, 250, 0.32) 0%, transparent 55%),
+    radial-gradient(120% 90% at 50% 100%, rgba(91, 91, 214, 0.30) 0%, transparent 60%);
+}
+
+/* ---------- COLOR (data-color en <html>): acento + aurora ---------- */
+:root[data-color='aurora'] {
+  --inova-primary: #5b5bd6; --inova-primary-2: #7c6cf0;
+  --f7-theme-color-rgb: 91, 91, 214; --f7-theme-color-shade: #4a4ac2; --f7-theme-color-tint: #7676e0;
+  --aurora-color: #f2f1fb;
+  --aurora-image:
+    radial-gradient(120% 80% at 5% 0%, rgba(124, 108, 240, 0.34) 0%, transparent 55%),
+    radial-gradient(110% 70% at 95% 8%, rgba(236, 72, 153, 0.2) 0%, transparent 55%),
+    radial-gradient(120% 90% at 50% 100%, rgba(34, 201, 147, 0.18) 0%, transparent 60%);
+}
+:root[data-color='indigo'] {
+  --inova-primary: #5b5bd6; --inova-primary-2: #7c6cf0;
+  --f7-theme-color-rgb: 91, 91, 214; --f7-theme-color-shade: #4a4ac2; --f7-theme-color-tint: #7676e0;
+  --aurora-color: #f2f1fb;
+  --aurora-image:
+    radial-gradient(120% 80% at 10% 0%, rgba(124, 108, 240, 0.32) 0%, transparent 55%),
+    radial-gradient(120% 80% at 100% 10%, rgba(91, 91, 214, 0.24) 0%, transparent 55%),
+    radial-gradient(120% 90% at 50% 100%, rgba(91, 91, 214, 0.16) 0%, transparent 60%);
+}
+:root[data-color='azul'] {
+  --inova-primary: #2563eb; --inova-primary-2: #4f8cff;
+  --f7-theme-color-rgb: 37, 99, 235; --f7-theme-color-shade: #1e56d6; --f7-theme-color-tint: #4a80f0;
+  --aurora-color: #eef2fd;
+  --aurora-image:
+    radial-gradient(120% 80% at 10% 0%, rgba(79, 140, 255, 0.32) 0%, transparent 55%),
+    radial-gradient(120% 80% at 100% 10%, rgba(37, 99, 235, 0.24) 0%, transparent 55%),
+    radial-gradient(120% 90% at 50% 100%, rgba(37, 99, 235, 0.16) 0%, transparent 60%);
+}
+:root[data-color='turquesa'] {
+  --inova-primary: #0891b2; --inova-primary-2: #22d3ee;
+  --f7-theme-color-rgb: 8, 145, 178; --f7-theme-color-shade: #077e9b; --f7-theme-color-tint: #1aa3c4;
+  --aurora-color: #ecf8fb;
+  --aurora-image:
+    radial-gradient(120% 80% at 10% 0%, rgba(34, 211, 238, 0.32) 0%, transparent 55%),
+    radial-gradient(120% 80% at 100% 10%, rgba(8, 145, 178, 0.24) 0%, transparent 55%),
+    radial-gradient(120% 90% at 50% 100%, rgba(8, 145, 178, 0.16) 0%, transparent 60%);
+}
+:root[data-color='esmeralda'] {
+  --inova-primary: #0ea472; --inova-primary-2: #22c993;
+  --f7-theme-color-rgb: 14, 164, 114; --f7-theme-color-shade: #0c8f63; --f7-theme-color-tint: #18c78d;
+  --aurora-color: #eef7f3;
+  --aurora-image:
+    radial-gradient(120% 80% at 10% 0%, rgba(34, 201, 147, 0.32) 0%, transparent 55%),
+    radial-gradient(120% 80% at 100% 10%, rgba(14, 164, 114, 0.24) 0%, transparent 55%),
+    radial-gradient(120% 90% at 50% 100%, rgba(14, 164, 114, 0.16) 0%, transparent 60%);
+}
+:root[data-color='atardecer'] {
+  --inova-primary: #f2603a; --inova-primary-2: #ff9f43;
+  --f7-theme-color-rgb: 242, 96, 58; --f7-theme-color-shade: #e04c27; --f7-theme-color-tint: #ff7a56;
+  --aurora-color: #fdf1ec;
+  --aurora-image:
+    radial-gradient(120% 80% at 10% 0%, rgba(255, 159, 67, 0.34) 0%, transparent 55%),
+    radial-gradient(120% 80% at 100% 10%, rgba(242, 96, 58, 0.24) 0%, transparent 55%),
+    radial-gradient(120% 90% at 50% 100%, rgba(242, 96, 58, 0.16) 0%, transparent 60%);
+}
+:root[data-color='rosa'] {
+  --inova-primary: #ec4899; --inova-primary-2: #f472b6;
+  --f7-theme-color-rgb: 236, 72, 153; --f7-theme-color-shade: #d63d87; --f7-theme-color-tint: #f05fa8;
+  --aurora-color: #fdeef6;
+  --aurora-image:
+    radial-gradient(120% 80% at 10% 0%, rgba(244, 114, 182, 0.32) 0%, transparent 55%),
+    radial-gradient(120% 80% at 100% 10%, rgba(236, 72, 153, 0.24) 0%, transparent 55%),
+    radial-gradient(120% 90% at 50% 100%, rgba(236, 72, 153, 0.16) 0%, transparent 60%);
+}
+:root[data-color='grafito'] {
+  --inova-primary: #3f3f46; --inova-primary-2: #71717a;
+  --f7-theme-color-rgb: 63, 63, 70; --f7-theme-color-shade: #2e2e33; --f7-theme-color-tint: #52525b;
+  --aurora-color: #eeeef0;
+  --aurora-image:
+    radial-gradient(120% 80% at 10% 0%, rgba(113, 113, 122, 0.28) 0%, transparent 55%),
+    radial-gradient(120% 80% at 100% 10%, rgba(63, 63, 70, 0.2) 0%, transparent 55%),
+    radial-gradient(120% 90% at 50% 100%, rgba(63, 63, 70, 0.14) 0%, transparent 60%);
+}
+
+/* ---------- TEMÁTICA (data-tematica en <html>): figuras de fondo ----------
+   Patrón neutro (negro translúcido) para que combine con cualquier color. */
+:root[data-tematica='perritos'] {
+  --tematica-size: 90px;
+  --tematica-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='90' height='90'%3E%3Cg fill='%23000000' fill-opacity='0.05'%3E%3Cellipse cx='45' cy='53' rx='11' ry='9'/%3E%3Ccircle cx='32' cy='39' r='4.5'/%3E%3Ccircle cx='43' cy='34' r='4.5'/%3E%3Ccircle cx='56' cy='37' r='4.5'/%3E%3Ccircle cx='58' cy='48' r='4'/%3E%3C/g%3E%3C/svg%3E");
+}
+:root[data-tematica='computo'] {
+  --tematica-size: 96px;
+  --tematica-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96'%3E%3Cg fill='%23000000' fill-opacity='0.05'%3E%3Crect x='30' y='30' width='36' height='24' rx='3'/%3E%3Crect x='43' y='56' width='10' height='5' rx='1'/%3E%3Crect x='35' y='63' width='26' height='3' rx='1.5'/%3E%3C/g%3E%3C/svg%3E");
+}
+:root[data-tematica='mundial'] {
+  --tematica-size: 92px;
+  --tematica-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='92' height='92'%3E%3Ccircle cx='46' cy='46' r='16' fill='none' stroke='%23000000' stroke-opacity='0.07' stroke-width='2'/%3E%3Cpolygon points='46,38 52,42.5 49.7,49.5 42.3,49.5 40,42.5' fill='%23000000' fill-opacity='0.07'/%3E%3C/svg%3E");
+}
+:root[data-tematica='f1'] {
+  --tematica-size: 84px;
+  --tematica-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='84' height='84'%3E%3Cg fill='%23000000' fill-opacity='0.06'%3E%3Crect x='24' y='24' width='9' height='9'/%3E%3Crect x='33' y='33' width='9' height='9'/%3E%3Crect x='42' y='24' width='9' height='9'/%3E%3Crect x='51' y='33' width='9' height='9'/%3E%3Crect x='24' y='42' width='9' height='9'/%3E%3Crect x='42' y='42' width='9' height='9'/%3E%3Crect x='33' y='51' width='9' height='9'/%3E%3Crect x='51' y='51' width='9' height='9'/%3E%3C/g%3E%3C/svg%3E");
+}
+
+/* Contenedores transparentes para que se vea el aurora del body. */
+.framework7-root,
+.views,
+.view,
+.page-content {
+  background: transparent !important;
+}
+
+/* Las .page SÍ llevan fondo propio: al navegar, F7 apila páginas y si fueran
+   transparentes se vería la anterior por debajo. Con el mismo aurora se ven
+   opacas y continuas (la .page no hace scroll, así que el degradado no se mueve). */
+.page {
+  background-color: var(--aurora-color) !important;
+  background-image: var(--tematica-image, none), var(--aurora-image);
+  background-size: var(--tematica-size, 90px) var(--tematica-size, 90px), auto, auto, auto;
+  background-repeat: repeat, no-repeat, no-repeat, no-repeat;
+}
+
+/* ---------- Edge-to-edge en iPhone (PWA instalada) ----------
+   El fondo aurora llega al borde físico (notch / Dynamic Island y home
+   indicator). El contenido lo empuja Framework7 a la zona segura con
+   env(safe-area-inset-*). Requiere viewport-fit=cover (ya está en index.html). */
+html {
+  background-color: #f2f1fb;
+}
+.dark html {
+  background-color: #0b0b13;
+}
+
+@media all and (display-mode: standalone) {
+  /* Nunca blanco en overscroll/rebote arriba o abajo */
+  html,
+  body {
+    background-color: #ece9fb;
+  }
+  .dark html,
+  .dark body {
+    background-color: #0b0b13;
+  }
+
+  /* Franja del notch: tinte de marca para que el reloj/batería (texto
+     blanco por la status bar translúcida) se lean sobre el fondo claro. */
+  body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: env(safe-area-inset-top);
+    /* Sigue el tema activo (var --f7-theme-color-rgb se sobrescribe por tema). */
+    background: linear-gradient(180deg, rgba(var(--f7-theme-color-rgb), 0.92), rgba(var(--f7-theme-color-rgb), 0.5));
+    z-index: 12000;
+    pointer-events: none;
+  }
+}
+
+/* ---------- Utilidad glass reutilizable ---------- */
+.glass {
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+}
+
+.glass-strong {
+  background: var(--glass-bg-strong);
+  -webkit-backdrop-filter: blur(28px) saturate(200%);
+  backdrop-filter: blur(28px) saturate(200%);
+  border: 1px solid var(--glass-border);
+}
+
+/* ---------- Navbar / Toolbar glass ---------- */
+.navbar .navbar-bg {
+  background: rgba(255, 255, 255, 0.6) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(20px) saturate(180%);
+}
+.dark .navbar .navbar-bg {
+  background: rgba(20, 18, 34, 0.55) !important;
+}
+.navbar .navbar-bg:after,
+.toolbar:before,
+.toolbar:after {
+  display: none !important;
+}
+
+/* ---------- Pastilla flotante glass (navegación inferior) ----------
+   Centrado con margin auto (SIN transform) y el vidrio en un pseudo-elemento:
+   en iOS Safari un elemento `position:fixed` con `backdrop-filter` propio
+   se oculta/desplaza al hacer scroll. Al mover el blur al ::before, el
+   elemento fijo se mantiene estable y los toques siempre llegan. */
+.floating-nav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  margin: 0 auto;
+  width: -moz-fit-content;
+  width: fit-content;
+  max-width: calc(100vw - 12px);
+  bottom: calc(14px + env(safe-area-inset-bottom));
+  z-index: 13500;
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  padding: 8px 7px;
+  border-radius: 999px;
+  box-shadow: 0 10px 34px rgba(17, 12, 46, 0.22), 0 2px 8px rgba(17, 12, 46, 0.1);
+  isolation: isolate;
+}
+.floating-nav::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  z-index: -1;
+  background: rgba(255, 255, 255, 0.72);
+  -webkit-backdrop-filter: blur(22px) saturate(180%);
+  backdrop-filter: blur(22px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+}
+
+.fnav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-width: 43px;
+  padding: 7px 4px;
+  border: none;
+  background: transparent;
+  border-radius: 14px;
+  cursor: pointer;
+  color: rgba(60, 60, 67, 0.55);
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  transition: color 0.15s ease, background 0.15s ease, transform 0.12s ease;
+}
+.dark .fnav-item { color: rgba(235, 235, 245, 0.5); }
+.fnav-item i.f7-icons { font-size: 24px; }
+.fnav-item:active { transform: scale(0.9); }
+.fnav-item.active { color: var(--inova-primary); }
+
+/* Ítem central "Crear": botón en gradiente */
+.fnav-item.create i.f7-icons {
+  width: 42px;
+  height: 32px;
+  border-radius: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 24px;
+  background: linear-gradient(135deg, var(--inova-primary), var(--inova-primary-2));
+  box-shadow: 0 5px 14px rgba(91, 91, 214, 0.4);
+}
+.fnav-item.create { color: rgba(60, 60, 67, 0.55); }
+.fnav-item.create.active { color: var(--inova-primary); }
+
+/* El contenido nunca queda tapado por la pastilla flotante */
+.page-content {
+  padding-bottom: calc(100px + env(safe-area-inset-bottom));
+}
+
+.navbar .title {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+/* ---------- Tarjetas glass ---------- */
+.card {
+  background: var(--glass-bg-strong);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+  border: 1px solid var(--glass-border);
+  border-radius: 22px;
+  box-shadow: var(--glass-shadow);
+  overflow: hidden;
+}
+.dark .card {
+  background: rgba(30, 27, 46, 0.45);
+}
+
+/* ---------- Listas glass ---------- */
+.list .item-content,
+.list ul {
+  background: transparent;
+}
+.list.glass-list ul {
+  background: var(--glass-bg-strong);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+  border: 1px solid var(--glass-border);
+  border-radius: 20px;
+  overflow: hidden;
+}
+
+/* ---------- Botones ---------- */
+.button-fill,
+.button.button-fill {
+  background: linear-gradient(135deg, var(--inova-primary), var(--inova-primary-2));
+  box-shadow: 0 8px 20px rgba(91, 91, 214, 0.35);
+  border-radius: 14px;
+}
+
+.button.glass-btn {
+  background: var(--glass-bg-strong);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border);
+  border-radius: 14px;
+}
+
+/* ---------- Chips de estatus (semáforo) ---------- */
+.st-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+.st-vencido { background: var(--st-vencido); }
+.st-hoy { background: var(--st-hoy); }
+.st-manana { background: var(--st-manana); }
+.st-tiempo { background: var(--st-tiempo); }
+.st-concluido { background: var(--st-concluido); }
+.st-espera { background: var(--st-espera); }
+
+.badge-glass {
+  background: var(--glass-bg-strong);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--glass-border);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* ---------- Ajuste en iPhone: contenido nunca desborda ---------- */
+.block,
+.block-title {
+  box-sizing: border-box;
+}
+img,
+.card,
+.list {
+  max-width: 100%;
+}
+
+/* ---------- Diálogos con lista larga (Responsable, Área) ----------
+   Un diálogo vertical con muchos botones (p. ej. 16 usuarios) es más alto que
+   la pantalla; como .dialog está centrado y con overflow:hidden, los botones
+   de arriba/abajo se recortaban y no se podían tocar. Aquí se limita la altura
+   y se hace scrolleable la lista de botones. El título queda fijo arriba. */
+.dialog { max-height: 82vh; }
+.dialog-buttons-vertical .dialog-buttons {
+  max-height: 64vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Transiciones suaves */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
