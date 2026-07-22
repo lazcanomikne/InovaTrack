@@ -11,7 +11,7 @@
       <!-- Una <f7-view> por tab. Al agregar un módulo: añade aquí su view y
            su entrada en `tabs` (abajo), con la misma convención id="view-<id>". -->
       <f7-views tabs class="safe-areas">
-        <f7-view id="view-inicio" main tab tab-active url="/" />
+        <f7-view id="view-vueltas" main tab tab-active url="/" />
         <f7-view id="view-perfil" tab url="/perfil/" />
       </f7-views>
 
@@ -60,11 +60,11 @@ const f7params = reactive({
 // <f7-view id="view-<id>"> arriba). Si hay un ítem de "crear", ponle
 // id 'captura' o añade la clase `create` para el botón en gradiente.
 const tabs = [
-  { id: 'inicio', label: 'Inicio', icon: 'house_fill' },
+  { id: 'vueltas', label: 'Mis vueltas', icon: 'square_list_fill' },
   { id: 'perfil', label: 'Perfil', icon: 'person_fill' },
 ];
 
-const active = ref('inicio');
+const active = ref('vueltas');
 
 // La pila se esconde mientras haya un modal abierto (evita que tape selectores).
 // Contamos aperturas y cierres; ignoramos toasts y notificaciones (son

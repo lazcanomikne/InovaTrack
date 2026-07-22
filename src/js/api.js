@@ -42,15 +42,34 @@ export const api = {
   patch: (p, body) => request(p, { method: 'PATCH', body }),
   del: (p) => request(p, { method: 'DELETE' }),
 
-  // ── Módulos de InovaTrack ──────────────────────────────────────────────
-  // Aquí se agregan los endpoints de cada módulo nuevo, p. ej.:
-  //   modulo: {
-  //     list: (query = '') => request(`/modulo${query}`),
-  //     get: (id) => request(`/modulo/${id}`),
-  //     create: (body) => request('/modulo', { method: 'POST', body }),
-  //     update: (id, body) => request(`/modulo/${id}`, { method: 'PATCH', body }),
-  //     remove: (id) => request(`/modulo/${id}`, { method: 'DELETE' }),
-  //   },
+  // ── Vueltas (reparto) ─────────────────────────────────────────────────
+  vueltas: {
+    // Vueltas de un día + contadores.
+    dia: (fecha) => request(`/vueltas?fecha=${fecha}`),
+    // Carga por día para la barra de calendario.
+    carga: (desde, hasta) => request(`/vueltas?desde=${desde}&hasta=${hasta}`),
+    // Escaneo: resuelve el folio y aplica las validaciones del Módulo 2.
+    escanear: (folio) => request(`/vueltas?folio=${encodeURIComponent(folio)}`),
+    crear: (body) => request('/vueltas', { method: 'POST', body }),
+    reordenar: (fecha, ids) => request('/vueltas', { method: 'PATCH', body: { fecha, ids } }),
+
+    detalle: (id) => request(`/vueltas/${id}`),
+    editar: (id, body) => request(`/vueltas/${id}`, { method: 'PATCH', body }),
+
+    entregar: (id, body) => request(`/vueltas/${id}`, { method: 'POST', body: { accion: 'entregar', ...body } }),
+    noEntregar: (id, body) => request(`/vueltas/${id}`, { method: 'POST', body: { accion: 'no_entregar', ...body } }),
+    reprogramar: (id, body) => request(`/vueltas/${id}`, { method: 'POST', body: { accion: 'reprogramar', ...body } }),
+    evidencia: (id, body) => request(`/vueltas/${id}`, { method: 'POST', body: { accion: 'evidencia', ...body } }),
+  },
+
+  catalogos: {
+    todo: () => request('/catalogos'),
+  },
+
+  // Cola offline: manda todas las acciones pendientes en un solo envío.
+  sync: {
+    enviar: (operaciones) => request('/sync', { method: 'POST', body: { operaciones } }),
+  },
 
   usuarios: {
     list: () => request('/usuarios'),
