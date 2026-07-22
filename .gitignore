@@ -10,3 +10,6 @@ scratch_icon/
 .vercel
 .env*
 scratch_*
+
+# El ejemplo SÍ se versiona (no tiene secretos)
+!.env.example
