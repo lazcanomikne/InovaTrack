@@ -98,7 +98,8 @@ const igualesEnTiempoConstante = (a, b) => {
 
 export async function usuarioPorEmail(email) {
   const { rows } = await db().execute({
-    sql: 'SELECT id, nombre, email, rol FROM usuarios WHERE lower(email) = lower(?)',
+    sql: `SELECT id, nombre, email, rol, COALESCE(activo, 1) AS activo
+          FROM usuarios WHERE lower(email) = lower(?)`,
     args: [email.trim()],
   });
   return rows[0] ?? null;

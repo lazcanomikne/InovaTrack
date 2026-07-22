@@ -34,12 +34,12 @@ export function limpiarSesion() {
   store.usuarios = [];
 }
 
-/* Recordamos el último usuario para que el chofer no lo teclee cada vez.
-   Es sólo una comodidad: sin la contraseña no da acceso a nada. */
-const CLAVE_USUARIO = 'inovatrack_ultimo_usuario';
-export const ultimoUsuario = () => {
-  try { return localStorage.getItem(CLAVE_USUARIO) || ''; } catch { return ''; }
+/* Recordamos el último correo para que el chofer no lo teclee cada vez.
+   Es sólo una comodidad: sin el código que llega al correo no da acceso a nada. */
+const CLAVE_EMAIL = 'inovatrack_ultimo_email';
+export const ultimoEmail = () => {
+  try { return localStorage.getItem(CLAVE_EMAIL) || ''; } catch { return ''; }
 };
-export const recordarUsuario = (usuario) => {
-  try { localStorage.setItem(CLAVE_USUARIO, usuario); } catch { /* modo privado */ }
+export const recordarEmail = (email) => {
+  try { localStorage.setItem(CLAVE_EMAIL, email); } catch { /* modo privado */ }
 };

@@ -151,14 +151,20 @@ export default async function handler(req, res) {
         const { email } = readBody(req);
         if (!email || !/^\S+@\S+\.\S+$/.test(email)) return sendError(res, 'Correo inválido');
 
+        // Registro CERRADO: sólo entra quien la oficina dio de alta. Una app de
+        // flotilla no puede permitir que cualquiera se auto-registre y aparezca
+        // como chofer. Altas con: scripts/chofer.mjs crear <correo> "<Nombre>"
+        const usuario = await usuarioPorEmail(email);
+        if (!usuario || Number(usuario.activo) === 0) {
+          return sendError(res, 'Ese correo no está dado de alta. Solicítalo en la oficina.', 403);
+        }
+
         const limite = await limiteEnvios(email);
         if (limite) return sendError(res, limite, 429);
 
-        // Registro abierto: enviamos el código exista o no la cuenta.
-        const usuario = await usuarioPorEmail(email);
         const codigo = generarCodigo();
         await guardarCodigo(email, codigo);
-        await enviarCodigo(email.trim(), codigo, usuario?.nombre?.split(' ')[0]);
+        await enviarCodigo(email.trim(), codigo, usuario.nombre?.split(' ')[0]);
         limpiarCodigos().catch(() => {});
         return sendJson(res, { ok: true });
       }
@@ -170,24 +176,14 @@ export default async function handler(req, res) {
         const r = await validarCodigo(email, String(codigo).trim());
         if (!r.ok) return sendError(res, r.error, 401);
 
-        if (r.usuario) {
-          res.setHeader('Set-Cookie', cookieSesion(await firmarSesion(r.usuario)));
-          return sendJson(res, { usuario: r.usuario });
+        // Sin auto-registro: si el código es válido pero la cuenta no existe
+        // (o la dieron de baja entre la solicitud y la verificación), no pasa.
+        if (!r.usuario) {
+          return sendError(res, 'Ese correo no está dado de alta. Solicítalo en la oficina.', 403);
         }
-        // Correo nuevo: pedimos el nombre. El token prueba que verificó el correo.
-        const token = await firmarRegistro(email.trim());
-        return sendJson(res, { registro: true, token });
-      }
 
-      case 'POST registrar': {
-        const { token, nombre } = readBody(req);
-        const email = await emailDeRegistro(token);
-        if (!email) return sendError(res, 'El registro expiró. Vuelve a empezar.', 400);
-        if (!nombre || nombre.trim().length < 2) return sendError(res, 'Escribe tu nombre completo.');
-
-        const nuevo = await crearColaborador(email, nombre);
-        res.setHeader('Set-Cookie', cookieSesion(await firmarSesion(nuevo)));
-        return sendJson(res, { usuario: nuevo });
+        res.setHeader('Set-Cookie', cookieSesion(await firmarSesion(r.usuario)));
+        return sendJson(res, { usuario: r.usuario });
       }
 
       case 'GET yo': {
