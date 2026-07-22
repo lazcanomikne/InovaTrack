@@ -342,7 +342,10 @@ function nuevaManual() {
 }
 
 function abrirDetalle(v) {
-  props.f7router?.navigate(`/vueltas/${v.id}/`);
+  // La página inicial de un tab no siempre recibe el prop f7router; en ese
+  // caso tomamos el router de la vista visible.
+  const router = props.f7router ?? f7.views?.current?.router ?? f7.view?.current?.router;
+  if (router) router.navigate(`/vueltas/${v.id}/`);
 }
 
 onMounted(cargar);
