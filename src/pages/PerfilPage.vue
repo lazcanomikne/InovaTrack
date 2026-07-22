@@ -17,55 +17,42 @@
           <div class="perfil-datos">
             <div class="perfil-nombre">{{ usuario.nombre }}</div>
             <div class="perfil-rol">{{ etiquetaRol }}</div>
-            <div class="perfil-email">{{ usuario.email }}</div>
+            <div class="perfil-email">@{{ usuario.usuario }}</div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Face ID / passkeys -->
-    <div class="block-title">Acceso rápido</div>
+    <!-- Datos de operación (Módulo 1) -->
+    <div class="block-title">Mis datos</div>
     <div class="list glass-list no-hairlines">
       <ul>
-        <li v-for="pk in passkeys" :key="pk.id">
+        <li>
           <div class="item-content">
-            <div class="item-media"><i class="f7-icons pk-icono">faceid</i></div>
+            <div class="item-media"><i class="f7-icons dato-icono">person_crop_circle</i></div>
             <div class="item-inner">
-              <div class="item-title">
-                {{ pk.dispositivo }}
-                <div class="item-footer">{{ pk.last_used_at ? 'Último uso: ' + fecha(pk.last_used_at) : 'Sin usar aún' }}</div>
-              </div>
-              <div class="item-after">
-                <a class="link text-color-red" @click="quitarPasskey(pk)">Quitar</a>
-              </div>
+              <div class="item-title">Usuario</div>
+              <div class="item-after">{{ usuario.usuario || '—' }}</div>
             </div>
           </div>
         </li>
-
-        <li v-if="!passkeys.length && soportaFaceId">
-          <a class="item-link item-content" @click="activarFaceId">
-            <div class="item-media"><i class="f7-icons pk-icono">faceid</i></div>
-            <div class="item-inner">
-              <div class="item-title">
-                Activar Face ID en este dispositivo
-                <div class="item-footer">Entra con un toque, sin escribir el código</div>
-              </div>
-            </div>
-          </a>
-        </li>
-
-        <li v-else-if="!passkeys.length">
+        <li>
           <div class="item-content">
-            <div class="item-inner text-color-gray">
-              Este dispositivo no soporta Face ID / passkeys.
+            <div class="item-media"><i class="f7-icons dato-icono">car_fill</i></div>
+            <div class="item-inner">
+              <div class="item-title">Vehículo</div>
+              <div class="item-after">{{ usuario.vehiculo || 'Sin asignar' }}</div>
             </div>
           </div>
         </li>
-
-        <li v-if="passkeys.length && soportaFaceId">
-          <a class="item-link item-content" @click="activarFaceId">
-            <div class="item-inner"><div class="item-title text-color-primary">Añadir otro dispositivo</div></div>
-          </a>
+        <li>
+          <div class="item-content">
+            <div class="item-media"><i class="f7-icons dato-icono">map_fill</i></div>
+            <div class="item-inner">
+              <div class="item-title">Ruta</div>
+              <div class="item-after">{{ usuario.ruta || 'Sin asignar' }}</div>
+            </div>
+          </div>
         </li>
       </ul>
     </div>
@@ -165,23 +152,20 @@ import { ref, computed, onMounted } from 'vue';
 import { f7 } from 'framework7-vue';
 import { api } from '@/js/api.js';
 import { store, limpiarSesion } from '@/js/store.js';
-import { tieneFaceId, registrarPasskey } from '@/js/passkey.js';
 import { estadoPush, activarPush, desactivarPush } from '@/js/push.js';
 import { TEMATICAS, COLORES, tematicaActual, colorActual, aplicarTematica, aplicarColor } from '@/js/tema.js';
 
-const usuario = computed(() => store.usuario ?? { nombre: '', rol: '', email: '' });
+const usuario = computed(() => store.usuario ?? { nombre: '', rol: '', usuario: '', vehiculo: '', ruta: '' });
 const version = __APP_VERSION__ || '0.1.0';
 const buildId = __BUILD_ID__ || '—';
 
-const ROLES = { direccion: 'Dirección General', jefe: 'Jefe directo', colaborador: 'Colaborador' };
+const ROLES = { chofer: 'Chofer', oficina: 'Oficina', direccion: 'Dirección' };
 const etiquetaRol = computed(() => ROLES[usuario.value.rol] ?? usuario.value.rol);
 
 const iniciales = computed(() =>
   (usuario.value.nombre || '?').split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase()
 );
 
-const passkeys = ref([]);
-const soportaFaceId = ref(false);
 const actualizando = ref(false);
 
 // Apariencia: temática (figuras) + color, independientes.
@@ -272,30 +256,8 @@ async function togglePush(e) {
 
 const fecha = (iso) => new Date(iso.replace(' ', 'T') + 'Z').toLocaleDateString();
 
-async function cargarPasskeys() {
-  try { passkeys.value = await api.auth.passkey.mias(); } catch { passkeys.value = []; }
-}
 
-async function activarFaceId() {
-  try {
-    const r = await registrarPasskey();
-    await cargarPasskeys();
-    f7.toast.create({ text: `Face ID activado en ${r.dispositivo} ✓`, closeTimeout: 2200, position: 'center' }).open();
-  } catch (e) {
-    f7.dialog.alert(e.message, 'Face ID');
-  }
-}
 
-function quitarPasskey(pk) {
-  f7.dialog.confirm(`Ya no podrás entrar con Face ID desde ${pk.dispositivo}.`, 'Quitar acceso', async () => {
-    try {
-      await api.auth.passkey.eliminar(pk.id);
-      await cargarPasskeys();
-    } catch (e) {
-      f7.dialog.alert(e.message, 'Error');
-    }
-  });
-}
 
 function salir() {
   f7.dialog.confirm('¿Cerrar sesión en este dispositivo?', 'Cerrar sesión', async () => {
@@ -328,8 +290,6 @@ async function buscarActualizacion() {
 }
 
 onMounted(async () => {
-  soportaFaceId.value = await tieneFaceId();
-  await cargarPasskeys();
   await refrescarPush();
 });
 </script>
@@ -388,6 +348,6 @@ onMounted(async () => {
 .perfil-nombre { font-size: 20px; font-weight: 800; }
 .perfil-rol { opacity: 0.7; font-size: 14px; }
 .perfil-email { opacity: 0.45; font-size: 12px; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; }
-.pk-icono { font-size: 26px; color: var(--inova-primary); }
+.dato-icono { font-size: 26px; color: var(--inova-primary); }
 .update-hint { text-align: center; font-size: 13px; opacity: 0.55; margin-top: 10px; }
 </style>

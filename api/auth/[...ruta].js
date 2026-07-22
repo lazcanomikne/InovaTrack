@@ -1,6 +1,7 @@
 // Router de autenticación: /api/auth/*
 // Se agrupa en una sola función serverless (Vercel Hobby limita el total).
 //
+//   POST /api/auth/login              { usuario, password }   ← choferes
 //   POST /api/auth/solicitar-codigo   { email }
 //   POST /api/auth/verificar-codigo   { email, codigo }
 //   GET  /api/auth/yo
@@ -24,6 +25,7 @@ import {
   firmarRegistro, emailDeRegistro, crearColaborador,
 } from '../_auth.js';
 import { enviarCodigo } from '../_mail.js';
+import { verificarPassword } from '../_password.js';
 
 // Contexto WebAuthn. Se deriva del propio request para no depender de que
 // las variables estén perfectas; las env var, si existen, tienen prioridad.
@@ -91,6 +93,58 @@ export default async function handler(req, res) {
 
   try {
     switch (`${req.method} ${ruta}`) {
+      /* ---------- Usuario + contraseña (choferes) ---------- */
+
+      case 'POST login': {
+        const { usuario, password } = readBody(req);
+        if (!usuario || !password) return sendError(res, 'Escribe tu usuario y contraseña');
+
+        const login = String(usuario).trim().toLowerCase();
+
+        // Freno a la fuerza bruta: 10 intentos fallidos en 15 min por usuario.
+        const fallidos = await db().execute({
+          sql: `SELECT COUNT(*) AS n FROM codigos_acceso
+                WHERE email = ? AND usado = 0 AND created_at > datetime('now','-15 minutes')`,
+          args: [`login:${login}`],
+        });
+        if (Number(fallidos.rows[0].n) >= 10) {
+          return sendError(res, 'Demasiados intentos. Espera 15 minutos.', 429);
+        }
+
+        const { rows } = await db().execute({
+          sql: `SELECT id, nombre, email, rol, usuario, password_hash, activo
+                FROM usuarios WHERE lower(usuario) = ?`,
+          args: [login],
+        });
+        const u = rows[0];
+
+        // Verificamos SIEMPRE, aunque el usuario no exista, para que el tiempo
+        // de respuesta no delate qué usuarios están dados de alta.
+        const ok = await verificarPassword(password, u?.password_hash ?? '');
+
+        if (!u || !ok || Number(u.activo) === 0) {
+          // Deja rastro del intento fallido (alimenta el contador de arriba).
+          await db().execute({
+            sql: `INSERT INTO codigos_acceso (email, codigo_hash, expira_en)
+                  VALUES (?, 'login-fallido', datetime('now','+15 minutes'))`,
+            args: [`login:${login}`],
+          });
+          return sendError(res, 'Usuario o contraseña incorrectos', 401);
+        }
+
+        // Al entrar bien, se limpian los intentos fallidos previos.
+        await db().execute({
+          sql: 'UPDATE codigos_acceso SET usado = 1 WHERE email = ?',
+          args: [`login:${login}`],
+        });
+
+        const token = await firmarSesion(u);
+        res.setHeader('Set-Cookie', cookieSesion(token));
+        return sendJson(res, {
+          usuario: { id: u.id, nombre: u.nombre, email: u.email, rol: u.rol, usuario: u.usuario },
+        });
+      }
+
       /* ---------- Código por correo ---------- */
 
       case 'POST solicitar-codigo': {
@@ -139,9 +193,27 @@ export default async function handler(req, res) {
       case 'GET yo': {
         const u = await sesionDe(req);
         if (!u) return sendError(res, 'No autenticado', 401);
-        const tiene = await credencialesDe(u.id);
-        const { rows } = await db().execute({ sql: 'SELECT avatar FROM usuarios WHERE id = ?', args: [u.id] });
-        return sendJson(res, { usuario: { ...u, avatar: rows[0]?.avatar ?? null }, passkeys: tiene.length });
+        // Los datos de operación se leen frescos: la oficina puede cambiar el
+        // vehículo o la ruta sin que el chofer tenga que volver a entrar.
+        const { rows } = await db().execute({
+          sql: 'SELECT avatar, usuario, vehiculo, ruta, activo FROM usuarios WHERE id = ?',
+          args: [u.id],
+        });
+        const d = rows[0];
+        // Si lo dieron de baja mientras tenía sesión abierta, se corta aquí.
+        if (!d || Number(d.activo) === 0) {
+          res.setHeader('Set-Cookie', cookieBorrar());
+          return sendError(res, 'Tu cuenta está dada de baja', 401);
+        }
+        return sendJson(res, {
+          usuario: {
+            ...u,
+            avatar: d.avatar ?? null,
+            usuario: d.usuario ?? null,
+            vehiculo: d.vehiculo ?? null,
+            ruta: d.ruta ?? null,
+          },
+        });
       }
 
       case 'POST salir': {

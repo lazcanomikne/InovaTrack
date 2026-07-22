@@ -62,6 +62,7 @@ export const api = {
     desuscribir: (endpoint) => request('/push', { method: 'DELETE', body: { endpoint } }),
   },
   auth: {
+    login: (usuario, password) => request('/auth/login', { method: 'POST', body: { usuario, password } }),
     yo: () => request('/auth/yo'),
     solicitarCodigo: (email) => request('/auth/solicitar-codigo', { method: 'POST', body: { email } }),
     verificarCodigo: (email, codigo) => request('/auth/verificar-codigo', { method: 'POST', body: { email, codigo } }),
