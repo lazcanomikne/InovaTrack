@@ -113,7 +113,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue';
+import { ref, computed, watch, nextTick, onBeforeUnmount, onMounted, onUnmounted } from 'vue';
 import { f7 } from 'framework7-vue';
 import { api } from '@/js/api.js';
 import * as haptics from '@/js/haptics.js';
@@ -148,7 +148,7 @@ const titulo = computed(() => {
 
 watch(() => props.abierto, (v) => {
   if (v) reiniciar();
-  else detenerCamara();
+  else detenerLectura();
 });
 
 function reiniciar() {
@@ -162,12 +162,12 @@ function reiniciar() {
 }
 
 function cerrar() {
-  detenerCamara();
+  detenerLectura();
   emit('update:abierto', false);
 }
 
 function retroceder() {
-  detenerCamara();
+  detenerLectura();
   if (paso.value === 'modo') paso.value = 'tipo';
   else if (paso.value === 'manual') paso.value = tipo.value === 'entrega' ? 'modo' : 'tipo';
   else if (paso.value === 'escaner') paso.value = 'modo';
@@ -212,6 +212,25 @@ async function irAEscaner() {
   arrancarCamara();
 }
 
+// Cámara compartida: getUserMedia es lo que dispara el permiso, así que se
+// llama UNA sola vez y el MediaStream se reutiliza en cada escaneo. Así iOS no
+// vuelve a preguntar en cada factura. Se suelta de verdad (apaga el indicador)
+// sólo al mandar la app a segundo plano o cerrarla (liberarCamara).
+let streamCompartido = null;
+
+async function obtenerStream() {
+  const vivo = streamCompartido?.getVideoTracks().some((t) => t.readyState === 'live');
+  if (vivo) return streamCompartido;
+  streamCompartido = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+  return streamCompartido;
+}
+
+function liberarCamara() {
+  detenerLectura();
+  try { streamCompartido?.getTracks().forEach((t) => t.stop()); } catch { /* ya suelta */ }
+  streamCompartido = null;
+}
+
 async function arrancarCamara() {
   // BarcodeDetector nativo (Android/Chrome) es lo más ligero; si no está, se
   // carga zxing bajo demanda (iOS Safari). El folio a mano siempre funciona.
@@ -240,12 +259,12 @@ async function arrancarCamara() {
 const FORMATOS_NATIVO = ['code_39', 'code_128', 'itf', 'ean_13', 'qr_code'];
 
 async function escanearConNativo() {
-  const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+  const stream = await obtenerStream();
   const v = video.value;
-  if (!v) { stream.getTracks().forEach((t) => t.stop()); return; }
+  if (!v) return;
   v.srcObject = stream;
   await v.play();
-  controles = { stop: () => stream.getTracks().forEach((t) => t.stop()) };
+  controles = null; // el loop se detiene solo al soltar el <video> (srcObject = null)
   // Sólo los formatos que el navegador soporte de verdad (algunos no traen
   // code_39); si la consulta falla, se deja que detecte todo.
   let formats = FORMATOS_NATIVO;
@@ -280,7 +299,14 @@ async function escanearConZxing() {
   ]);
   hints.set(DecodeHintType.TRY_HARDER, true);
   lector = new BrowserMultiFormatReader(hints);
-  controles = await lector.decodeFromVideoDevice(undefined, video.value, (resultado) => {
+  // decodeFromVideoElement (no ...VideoDevice): el stream lo abrimos y
+  // reutilizamos nosotros; el stop() de zxing sólo corta el loop, no el track.
+  const stream = await obtenerStream();
+  const v = video.value;
+  if (!v) return;
+  v.srcObject = stream;
+  await v.play();
+  controles = await lector.decodeFromVideoElement(v, (resultado) => {
     if (resultado) onCodigo(resultado.getText());
   });
 }
@@ -289,16 +315,19 @@ function onCodigo(texto) {
   const folio = String(texto ?? '').trim();
   if (!folio) return;
   haptics.exito();
-  detenerCamara();
+  detenerLectura();
   resolverFolio(folio);
 }
 
-function detenerCamara() {
+// Detiene el escaneo y suelta el <video>, PERO conserva el stream de cámara
+// vivo para el próximo escaneo (no re-pedir permiso). Para apagar la cámara
+// de verdad, ver liberarCamara().
+function detenerLectura() {
   try { controles?.stop?.(); } catch { /* ya estaba detenida */ }
   controles = null;
   lector = null;
   const v = video.value;
-  if (v?.srcObject) { v.srcObject.getTracks?.().forEach((t) => t.stop()); v.srcObject = null; }
+  if (v?.srcObject) v.srcObject = null;
 }
 
 async function resolverFolio(folio) {
@@ -317,7 +346,7 @@ async function resolverFolio(folio) {
       f7.dialog.confirm(
         `${r.mensaje}\n\n¿Capturarla como vuelta manual?`,
         'Factura',
-        () => { tipo.value = 'entrega'; nombre.value = f; paso.value = 'manual'; detenerCamara(); enfocarNombre(); }
+        () => { tipo.value = 'entrega'; nombre.value = f; paso.value = 'manual'; detenerLectura(); enfocarNombre(); }
       );
     }
   } catch (e) {
@@ -353,7 +382,13 @@ function confirmarFactura() {
   cerrar();
 }
 
-onBeforeUnmount(detenerCamara);
+// La cámara se conserva viva entre escaneos (para no re-pedir permiso), pero
+// se suelta cuando la app pasa a segundo plano: así no queda el indicador
+// encendido mientras el chofer usa otra cosa.
+function alOcultar() { if (document.hidden) liberarCamara(); }
+onMounted(() => document.addEventListener('visibilitychange', alOcultar));
+onUnmounted(() => document.removeEventListener('visibilitychange', alOcultar));
+onBeforeUnmount(liberarCamara);
 </script>
 
 <style scoped>

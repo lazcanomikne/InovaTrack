@@ -120,6 +120,20 @@ export function enlaceMapa(direccion) {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(direccion)}`;
 }
 
+// Enlaces de NAVEGACIÓN (no búsqueda) a la dirección. Son enlaces https
+// universales: el teléfono los abre en la app instalada (Google Maps / Waze /
+// Apple Maps) y, si no la tiene, en el navegador. Así el chofer elige con qué
+// llegar. `null` si no hay dirección.
+export function enlacesNavegacion(direccion) {
+  if (!direccion) return null;
+  const q = encodeURIComponent(direccion);
+  return {
+    google: `https://www.google.com/maps/dir/?api=1&destination=${q}`,
+    waze: `https://waze.com/ul?q=${q}&navigate=yes`,
+    apple: `https://maps.apple.com/?daddr=${q}`,
+  };
+}
+
 /* ------------------------------- Búsqueda ----------------------------- */
 const normalizar = (s) =>
   String(s ?? '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');

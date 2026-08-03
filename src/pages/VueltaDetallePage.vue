@@ -34,9 +34,9 @@
         <a class="rap wa" :class="{ off: !wa }" :href="wa || undefined" target="_blank" rel="noopener">
           <i class="f7-icons">chat_bubble_2_fill</i><span>WhatsApp</span>
         </a>
-        <a class="rap mapa" :class="{ off: !mapa }" :href="mapa || undefined" target="_blank" rel="noopener">
+        <button type="button" class="rap mapa" :class="{ off: !navegacion }" @click="abrirComoLlegar">
           <i class="f7-icons">map_fill</i><span>Cómo llegar</span>
-        </a>
+        </button>
       </div>
 
       <!-- ── Datos ──────────────────────────────────────────────────── -->
@@ -141,14 +141,15 @@
 
       <!-- ── Acciones de cierre ─────────────────────────────────────── -->
       <div v-if="abierta && !soloLectura" class="acciones-pie">
-        <button type="button" class="btn-grande ok" @click="abrirEntrega">
-          <i class="f7-icons">checkmark_alt</i> Marcar entregada
+        <button type="button" class="btn-cierre ok" @click="abrirEntrega">
+          <span class="btn-ic"><i class="f7-icons">checkmark_alt</i></span>
+          Marcar entregada
         </button>
         <div class="acciones-fila">
-          <button type="button" class="btn-grande mal" @click="noEntregar">
-            <i class="f7-icons">xmark</i> No entregada
+          <button type="button" class="btn-cierre mal" @click="noEntregar">
+            <i class="f7-icons">xmark_circle</i> No entregada
           </button>
-          <button type="button" class="btn-grande neutro" @click="reprogramar">
+          <button type="button" class="btn-cierre neutro" @click="reprogramar">
             <i class="f7-icons">calendar</i> Reprogramar
           </button>
         </div>
@@ -292,7 +293,7 @@ import { store, setMotivos } from '@/js/store.js';
 import * as cola from '@/js/cola.js';
 import {
   estadoInfo, estaAbierta, esCritica, tituloVuelta, etiquetaFecha, horaCorta,
-  enlaceLlamada, enlaceWhatsApp, enlaceMapa, sumarDias, hoy,
+  enlaceLlamada, enlaceWhatsApp, enlacesNavegacion, sumarDias, hoy,
 } from '@/js/vueltas.js';
 import { comprimirFoto, firmaABlob, nombreFoto, nombreFirma, pesoLegible } from '@/js/evidencias.js';
 
@@ -311,7 +312,27 @@ const editable = computed(() => abierta.value && !soloLectura.value);
 
 const tel = computed(() => enlaceLlamada(v.value?.telefono));
 const wa = computed(() => enlaceWhatsApp(v.value?.telefono));
-const mapa = computed(() => enlaceMapa(v.value?.direccion));
+const navegacion = computed(() => enlacesNavegacion(v.value?.direccion));
+
+// "Cómo llegar": el chofer elige app. Los enlaces son universales, así que se
+// abren en Google Maps / Waze / Apple Maps si están instaladas, o en el
+// navegador si no. Con una sola app disponible igual sirve: el SO la abre.
+function abrirComoLlegar() {
+  const e = navegacion.value;
+  if (!e) return;
+  const abrir = (url) => window.open(url, '_blank', 'noopener');
+  f7.actions.create({
+    buttons: [
+      [
+        { text: '¿Con qué app quieres llegar?', label: true },
+        { text: 'Google Maps', bold: true, onClick: () => abrir(e.google) },
+        { text: 'Waze', onClick: () => abrir(e.waze) },
+        { text: 'Apple Maps', onClick: () => abrir(e.apple) },
+      ],
+      [{ text: 'Cancelar', color: 'red' }],
+    ],
+  }).open();
+}
 
 const EVENTOS = {
   creada: 'Creada', editada: 'Editada', entregada: 'Entregada',
@@ -598,10 +619,11 @@ onMounted(cargar);
 /* ---------------- Contacto rápido ---------------- */
 .rapidas { display: flex; gap: 8px; padding: 0 16px 4px; }
 .rap {
-  flex: 1; height: 62px; border-radius: 16px; text-decoration: none;
+  flex: 1; width: auto; height: 62px; border-radius: 16px; text-decoration: none;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
   background: var(--sup-campo); border: 1px solid var(--glass-border);
   color: var(--inova-primary); font-size: 11px; font-weight: 700;
+  font-family: inherit; cursor: pointer;
 }
 .rap i { font-size: 21px; }
 .rap.wa { color: #25d366; }
@@ -672,20 +694,41 @@ onMounted(cargar);
 .hito-meta { font-size: 11px; opacity: 0.45; margin-top: 2px; }
 .hito-gps i { font-size: 11px; }
 
-/* ---------------- Acciones ---------------- */
-.acciones-pie { padding: 20px 16px calc(125px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 9px; }
-.acciones-fila { display: flex; gap: 9px; }
-.btn-grande {
-  flex: 1; height: 54px; border: none; border-radius: 16px; cursor: pointer;
-  display: flex; align-items: center; justify-content: center; gap: 7px;
-  font-size: 16px; font-weight: 700; color: #fff;
-  transition: transform 0.1s ease;
+/* ---------------- Acciones de cierre ---------------- */
+.acciones-pie { padding: 20px 16px calc(125px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 10px; }
+.acciones-fila { display: flex; gap: 10px; }
+.btn-cierre {
+  flex: 1; border: none; border-radius: 16px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  font-size: 15px; font-weight: 700; font-family: inherit; color: inherit;
+  transition: transform 0.12s ease, filter 0.15s ease;
 }
-.btn-grande:active { transform: scale(0.97); }
-.btn-grande i { font-size: 19px; }
-.btn-grande.ok { background: #30d158; box-shadow: 0 6px 18px rgba(48,209,88,0.35); }
-.btn-grande.mal { background: #ff453a; }
-.btn-grande.neutro { background: var(--btn-neutro); }
+.btn-cierre:active { transform: scale(0.96); }
+.btn-cierre i { font-size: 19px; }
+
+/* Primaria: la acción dominante, verde con relieve suave. */
+.btn-cierre.ok {
+  height: 58px; font-size: 17px; color: #fff;
+  background: linear-gradient(135deg, #34d16a, #23ab54);
+  box-shadow: 0 8px 20px rgba(36, 178, 87, 0.28);
+}
+.btn-cierre.ok:active { filter: brightness(0.97); }
+/* Ícono en una pastilla translúcida para darle jerarquía a la primaria. */
+.btn-cierre .btn-ic {
+  display: flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border-radius: 9px; background: rgba(255, 255, 255, 0.22);
+}
+.btn-cierre .btn-ic i { font-size: 18px; }
+
+/* Secundarias: tintadas (menos peso visual que la primaria). */
+.btn-cierre.mal, .btn-cierre.neutro {
+  height: 50px; border: 1px solid transparent;
+}
+.btn-cierre.mal { background: rgba(255, 69, 58, 0.13); color: #e5342a; }
+.btn-cierre.neutro {
+  background: var(--sup-campo); color: inherit; border-color: var(--glass-border);
+}
+.dark .btn-cierre.mal { background: rgba(255, 69, 58, 0.22); color: #ff6b61; }
 
 /* ---------------- Hoja de entrega ---------------- */
 .hoja-fondo {
