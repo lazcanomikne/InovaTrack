@@ -55,6 +55,9 @@ export default async function handler(req, res) {
       const r = await aplicar(client, op, sesion);
       resultados.push({ client_uuid: uuid, ok: true, ...r });
     } catch (e) {
+      // Diagnóstico temporal: por qué falla una operación en el lote (sin
+      // datos sensibles). Se ve en los runtime logs de Vercel.
+      console.error(`[sync] op="${op?.tipo}" origen="${op?.origen ?? '-'}" folio="${op?.factura_folio ?? '-'}" partidas=${Array.isArray(op?.partidas) ? op.partidas.length : 'n/a'} FALLO ${e?.name}: ${e?.message}`);
       // Un fallo no detiene el resto: se reporta y se sigue. Si es un
       // conflicto sobre una vuelta identificable, además se cierra el
       // círculo: queda en 'revision' con el motivo (no sólo en la
