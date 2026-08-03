@@ -133,11 +133,6 @@
         </div>
       </div>
     </div>
-
-    <!-- ── Botón de captura manual (Módulo 3) ─────────────────────────── -->
-    <button v-if="!soloLectura" type="button" class="fab" @click="nuevaManual">
-      <i class="f7-icons">plus</i>
-    </button>
   </f7-page>
 </template>
 
@@ -192,6 +187,7 @@ async function cargar() {
   try {
     const d = await api.vueltas.dia(fecha.value);
     soloLectura.value = d.solo_lectura;
+    store.soloLectura = d.solo_lectura; // la pastilla atenúa "Nueva" con esto
     hoyStr.value = d.hoy;
     // Sobre lo que trae el servidor, reaplica lo que la cola offline aún no
     // sincronizó: así una recarga en modo avión no deshace lo ya marcado.
@@ -208,6 +204,11 @@ async function cargar() {
 function alSincronizar() { cargar(); }
 onMounted(() => window.addEventListener(cola.EVENTO_SINCRONIZADO, alSincronizar));
 onUnmounted(() => window.removeEventListener(cola.EVENTO_SINCRONIZADO, alSincronizar));
+
+// La pastilla de navegación (App.vue) dispara esto al tocar "Nueva": el ítem
+// central no es un tab, vive como acción sobre esta pantalla (Módulo 3).
+onMounted(() => f7.on('abrirCaptura', nuevaManual));
+onUnmounted(() => f7.off('abrirCaptura', nuevaManual));
 
 async function cargarBarra() {
   try {
@@ -458,9 +459,9 @@ onMounted(cargar);
 .limpiar { border: none; background: transparent; color: inherit; opacity: 0.35; cursor: pointer; }
 
 /* ---------------- Lista ---------------- */
-/* El padding inferior deja libre la última tarjeta: por encima queda el botón
-   flotante y, más abajo, la pastilla de navegación. */
-.lista { display: flex; flex-direction: column; gap: 10px; padding: 0 16px 84px; }
+/* El padding inferior deja libre la última tarjeta por encima de la pastilla
+   de navegación (crecida: ver .floating-nav en app.css). */
+.lista { display: flex; flex-direction: column; gap: 10px; padding: 0 16px 98px; }
 
 .tarjeta {
   position: relative; overflow: hidden;
@@ -524,17 +525,4 @@ onMounted(cargar);
 .aviso-icono { font-size: 34px; opacity: 0.3; }
 .aviso-t { font-size: 16px; font-weight: 700; margin-top: 8px; }
 .aviso-s { font-size: 13px; opacity: 0.55; margin-top: 4px; line-height: 1.4; }
-
-/* ---------------- Botón flotante ---------------- */
-.fab {
-  position: fixed; right: 18px;
-  bottom: calc(96px + env(safe-area-inset-bottom));
-  width: 54px; height: 54px; border-radius: 18px; border: none;
-  z-index: 100; cursor: pointer; color: #fff;
-  background: linear-gradient(135deg, var(--inova-primary), var(--inova-primary-2));
-  box-shadow: 0 8px 22px rgba(91,91,214,0.45);
-  transition: transform 0.12s ease;
-}
-.fab:active { transform: scale(0.92); }
-.fab i { font-size: 26px; }
 </style>
