@@ -85,7 +85,6 @@ export const api = {
     yo: () => request('/auth/yo'),
     solicitarCodigo: (email) => request('/auth/solicitar-codigo', { method: 'POST', body: { email } }),
     verificarCodigo: (email, codigo) => request('/auth/verificar-codigo', { method: 'POST', body: { email, codigo } }),
-    registrar: (token, nombre) => request('/auth/registrar', { method: 'POST', body: { token, nombre } }),
     salir: () => request('/auth/salir', { method: 'POST' }),
     passkey: {
       opcionesRegistro: () => request('/auth/passkey/registro/opciones', { method: 'POST' }),

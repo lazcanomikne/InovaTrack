@@ -162,40 +162,11 @@ export async function validarCodigo(email, codigo) {
   // Acertó: invalida éste y cualquier otro pendiente del mismo correo.
   await c.execute({ sql: 'UPDATE codigos_acceso SET usado = 1 WHERE lower(email) = lower(?)', args: [email] });
 
-  // usuario puede ser null: registro abierto lo creará tras capturar el nombre.
+  // usuario puede ser null: el correo no está dado de alta. El registro está
+  // CERRADO (ver 'POST verificar-codigo' en el router), así que esto sólo
+  // termina en un 403, nunca en un alta automática.
   const usuario = await usuarioPorEmail(email);
   return { ok: true, usuario: usuario ?? null };
-}
-
-/* --- Token corto de registro: prueba que el correo fue verificado ---
-   Se emite cuando entra un correo nuevo; el paso "registrar" lo canjea. */
-export async function firmarRegistro(email) {
-  return new SignJWT({ email: email.toLowerCase(), typ: 'registro' })
-    .setProtectedHeader({ alg: 'HS256' })
-    .setIssuedAt()
-    .setExpirationTime('15m')
-    .sign(llave());
-}
-
-export async function emailDeRegistro(token) {
-  try {
-    const { payload } = await jwtVerify(token, llave());
-    return payload.typ === 'registro' ? payload.email : null;
-  } catch {
-    return null;
-  }
-}
-
-/** Crea (o recupera) un colaborador con ese correo. */
-export async function crearColaborador(email, nombre) {
-  const existente = await usuarioPorEmail(email);
-  if (existente) return existente;
-  const { rows } = await db().execute({
-    sql: `INSERT INTO usuarios (nombre, email, rol) VALUES (?, ?, 'colaborador')
-          RETURNING id, nombre, email, rol`,
-    args: [nombre.trim(), email.toLowerCase()],
-  });
-  return rows[0];
 }
 
 /** Limpieza de códigos viejos (se llama de paso, sin costo real). */
