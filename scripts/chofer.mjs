@@ -7,6 +7,7 @@
 //
 //   node --env-file-if-exists=.env scripts/chofer.mjs crear <correo> "<Nombre>" [vehiculo] [ruta]
 //   node --env-file-if-exists=.env scripts/chofer.mjs editar <correo> [vehiculo] [ruta]
+//   node --env-file-if-exists=.env scripts/chofer.mjs rol   <correo> <chofer|oficina|direccion>
 //   node --env-file-if-exists=.env scripts/chofer.mjs baja  <correo>
 //   node --env-file-if-exists=.env scripts/chofer.mjs alta  <correo>
 //   node --env-file-if-exists=.env scripts/chofer.mjs lista
@@ -66,6 +67,23 @@ switch (accion) {
     break;
   }
 
+  // Promover o degradar. Es la única vía para crear el PRIMER administrador:
+  // el panel de la app exige ya ser oficina/dirección para tocar roles.
+  case 'rol': {
+    const [email, rol] = args;
+    const ROLES = ['chofer', 'oficina', 'direccion'];
+    if (!ROLES.includes(rol)) {
+      console.error(`✗ Rol inválido. Usa uno de: ${ROLES.join(' | ')}`);
+      process.exit(1);
+    }
+    const u = await buscar(email);
+    if (!u) { console.error('✗ No existe ese correo.'); process.exit(1); }
+    if (u.rol === rol) { console.log(`= "${u.email}" ya era ${rol}; no se cambió nada.`); break; }
+    await db.execute({ sql: 'UPDATE usuarios SET rol = ? WHERE id = ?', args: [rol, u.id] });
+    console.log(`✓ "${u.email}": ${u.rol} → ${rol}.`);
+    break;
+  }
+
   case 'baja':
   case 'alta': {
     const [email] = args;
@@ -96,7 +114,7 @@ switch (accion) {
   }
 
   default:
-    console.log(`Acciones: crear | editar | baja | alta | lista
+    console.log(`Acciones: crear | editar | rol | baja | alta | lista
 
   node --env-file-if-exists=.env scripts/chofer.mjs crear juan@inovatech.com.mx "Juan Pérez" "Nissan NP300" "Centro"
   node --env-file-if-exists=.env scripts/chofer.mjs lista`);
