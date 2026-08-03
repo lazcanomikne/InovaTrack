@@ -24,6 +24,20 @@
   --glass-shadow: 0 8px 32px rgba(17, 12, 46, 0.18);
   --glass-blur: 22px;
 
+  /* Superficies y tintes semánticos. Todo lo que dependa de si el fondo es
+     claro u oscuro se pide por aquí y NO se escribe a mano en cada pantalla:
+     el bloque .dark de abajo es el único sitio donde se invierte. */
+  --sup-campo: rgba(255, 255, 255, 0.6);   /* inputs, cajas de dato */
+  --sup-sutil: rgba(0, 0, 0, 0.07);        /* chips, contadores, miniaturas */
+  --linea: rgba(0, 0, 0, 0.08);            /* divisores */
+  --btn-neutro: rgba(0, 0, 0, 0.4);        /* botón secundario sólido */
+  --texto-tenue: #6b6780;
+  --borde-chip: rgba(255, 255, 255, 0.7);  /* aro de los círculos del selector */
+  --ambar-bg: rgba(255, 159, 10, 0.18);
+  --ambar-fg: #b26a00;
+  --verde-bg: rgba(48, 209, 88, 0.18);
+  --verde-fg: #1f8a3d;
+
   /* Framework7 primary override */
   --f7-theme-color: var(--inova-primary);
   --f7-theme-color-rgb: 91, 91, 214;
@@ -52,6 +66,25 @@ body {
     radial-gradient(120% 90% at 50% 100%, rgba(91, 91, 214, 0.22) 0%, transparent 60%);
 }
 .dark {
+  /* El vidrio en oscuro no puede seguir siendo blanco translúcido: sobre el
+     fondo negro se vería lechoso. Se baja a un velo claro muy tenue. */
+  --glass-bg: rgba(255, 255, 255, 0.05);
+  --glass-bg-strong: rgba(255, 255, 255, 0.09);
+  --glass-border: rgba(255, 255, 255, 0.12);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+
+  --sup-campo: rgba(255, 255, 255, 0.08);
+  --sup-sutil: rgba(255, 255, 255, 0.12);
+  --linea: rgba(255, 255, 255, 0.12);
+  --btn-neutro: rgba(255, 255, 255, 0.18);
+  --texto-tenue: rgba(235, 235, 245, 0.6);
+  --borde-chip: rgba(255, 255, 255, 0.16);
+  /* Los tintes de estado se saturan y aclaran: #b26a00 sobre negro no se lee. */
+  --ambar-bg: rgba(255, 159, 10, 0.22);
+  --ambar-fg: #ffb454;
+  --verde-bg: rgba(48, 209, 88, 0.22);
+  --verde-fg: #5ee07f;
+
   --aurora-color: #0b0b13;
   --aurora-image:
     radial-gradient(120% 80% at 10% 0%, rgba(124, 108, 240, 0.45) 0%, transparent 55%),
@@ -146,6 +179,19 @@ body {
     radial-gradient(120% 80% at 10% 0%, rgba(113, 113, 122, 0.28) 0%, transparent 55%),
     radial-gradient(120% 80% at 100% 10%, rgba(63, 63, 70, 0.2) 0%, transparent 55%),
     radial-gradient(120% 90% at 50% 100%, rgba(63, 63, 70, 0.14) 0%, transparent 60%);
+}
+
+/* El oscuro manda sobre la paleta elegida. Tiene que ir AQUÍ —después de los
+   ocho bloques de color y escrito `:root.dark`, no `.dark`— porque
+   `:root[data-color='…']` pesa más que `.dark` y le devolvía el aurora claro:
+   como `.page` se pinta con `--aurora-color`, la app entera se seguía viendo
+   en claro con el texto ya en blanco. Misma especificidad, pero más abajo. */
+:root.dark {
+  --aurora-color: #0b0b13;
+  --aurora-image:
+    radial-gradient(120% 80% at 10% 0%, rgba(124, 108, 240, 0.40) 0%, transparent 55%),
+    radial-gradient(120% 80% at 100% 10%, rgba(167, 139, 250, 0.26) 0%, transparent 55%),
+    radial-gradient(120% 90% at 50% 100%, rgba(91, 91, 214, 0.24) 0%, transparent 60%);
 }
 
 /* ---------- TEMÁTICA (data-tematica en <html>): figuras de fondo ----------
@@ -333,6 +379,9 @@ html {
   box-shadow: 0 5px 14px rgba(91, 91, 214, 0.4);
 }
 .fnav-item.create { color: rgba(60, 60, 67, 0.55); }
+/* Empata en especificidad con `.fnav-item.create` y va después, si no el gris
+   oscuro del rótulo "Nueva" gana y desaparece sobre el fondo negro. */
+.dark .fnav-item.create { color: rgba(235, 235, 245, 0.5); }
 .fnav-item.create.active { color: var(--inova-primary); }
 /* Día pasado (sólo consulta): visible pero sin invitar al toque; el tap
    sigue llegando (nada de pointer-events:none) para poder avisar con un toast. */

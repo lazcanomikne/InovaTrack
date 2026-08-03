@@ -185,8 +185,8 @@ onUnmounted(() => clearInterval(cronometro));
 .campo label { display: block; font-size: 12px; font-weight: 600; opacity: 0.6; margin-bottom: 6px; }
 .campo input {
   width: 100%; box-sizing: border-box; height: 48px; padding: 0 14px;
-  border-radius: 14px; border: 1px solid rgba(0, 0, 0, 0.1);
-  background: rgba(255, 255, 255, 0.7); font-size: 16px; color: inherit;
+  border-radius: 14px; border: 1px solid var(--linea);
+  background: var(--sup-campo); font-size: 16px; color: inherit;
 }
 .campo input:focus { outline: 2px solid var(--inova-primary); outline-offset: -1px; }
 .input-codigo {

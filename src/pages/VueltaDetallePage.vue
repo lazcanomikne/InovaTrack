@@ -589,10 +589,10 @@ onMounted(cargar);
 .cab-dest { font-size: 14px; opacity: 0.6; margin-top: 3px; }
 .cab-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 11px; }
 
-.chip { font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 999px; background: rgba(0,0,0,0.07); }
+.chip { font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 999px; background: var(--sup-sutil); }
 .chip.factura { background: rgba(91,91,214,0.14); color: var(--inova-primary); }
-.chip.manual { background: rgba(255,159,10,0.18); color: #b26a00; }
-.chip.reintento { background: rgba(255,159,10,0.2); color: #b26a00; }
+.chip.manual { background: var(--ambar-bg); color: var(--ambar-fg); }
+.chip.reintento { background: var(--ambar-bg); color: var(--ambar-fg); }
 .chip.critica { background: #ff453a; color: #fff; }
 
 /* ---------------- Contacto rápido ---------------- */
@@ -600,7 +600,7 @@ onMounted(cargar);
 .rap {
   flex: 1; height: 62px; border-radius: 16px; text-decoration: none;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
-  background: rgba(255,255,255,0.6); border: 1px solid var(--glass-border);
+  background: var(--sup-campo); border: 1px solid var(--glass-border);
   color: var(--inova-primary); font-size: 11px; font-weight: 700;
 }
 .rap i { font-size: 21px; }
@@ -630,12 +630,12 @@ onMounted(cargar);
 }
 
 .tarjeta-datos { border-radius: 16px; padding: 4px 14px; }
-.dato { display: flex; gap: 11px; padding: 11px 0; border-bottom: 1px solid rgba(0,0,0,0.06); font-size: 15px; }
+.dato { display: flex; gap: 11px; padding: 11px 0; border-bottom: 1px solid var(--linea); font-size: 15px; }
 .dato:last-child { border-bottom: none; }
 .dato i { font-size: 17px; opacity: 0.35; flex-shrink: 0; margin-top: 2px; }
 .dato-lbl { display: block; font-size: 11px; opacity: 0.5; margin-bottom: 1px; }
 
-.partida { display: flex; gap: 12px; padding: 11px 0; border-bottom: 1px solid rgba(0,0,0,0.06); }
+.partida { display: flex; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--linea); }
 .partida:last-child { border-bottom: none; }
 .part-desc { flex: 1; min-width: 0; font-size: 14px; }
 .part-art { font-size: 11px; opacity: 0.5; font-weight: 700; }
@@ -647,7 +647,7 @@ onMounted(cargar);
 .evid-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .evid {
   position: relative; aspect-ratio: 1; border: none; padding: 0; cursor: pointer;
-  border-radius: 13px; overflow: hidden; background: rgba(0,0,0,0.05);
+  border-radius: 13px; overflow: hidden; background: var(--sup-sutil);
 }
 .evid img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .evid-tipo {
@@ -661,7 +661,7 @@ onMounted(cargar);
 .hito { display: flex; gap: 12px; padding-bottom: 14px; position: relative; }
 .hito:not(:last-child)::before {
   content: ''; position: absolute; left: 4px; top: 14px; bottom: 0;
-  width: 2px; background: rgba(0,0,0,0.1);
+  width: 2px; background: var(--linea);
 }
 .hito-punto {
   width: 10px; height: 10px; border-radius: 50%; margin-top: 4px; flex-shrink: 0;
@@ -685,7 +685,7 @@ onMounted(cargar);
 .btn-grande i { font-size: 19px; }
 .btn-grande.ok { background: #30d158; box-shadow: 0 6px 18px rgba(48,209,88,0.35); }
 .btn-grande.mal { background: #ff453a; }
-.btn-grande.neutro { background: rgba(0,0,0,0.4); }
+.btn-grande.neutro { background: var(--btn-neutro); }
 
 /* ---------------- Hoja de entrega ---------------- */
 .hoja-fondo {
@@ -702,7 +702,7 @@ onMounted(cargar);
 .hoja.hoja-chica { max-height: none; }
 .hoja-barra {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 14px 16px; border-bottom: 1px solid rgba(0,0,0,0.08);
+  padding: 14px 16px; border-bottom: 1px solid var(--linea);
   font-size: 16px; flex-shrink: 0;
 }
 .hoja-x, .hoja-ok {
@@ -718,13 +718,13 @@ onMounted(cargar);
 .campo input {
   width: 100%; box-sizing: border-box; height: 50px; padding: 0 14px;
   border-radius: 14px; border: 1px solid var(--glass-border);
-  background: rgba(255,255,255,0.75); font-size: 16px; color: inherit;
+  background: var(--sup-campo); font-size: 16px; color: inherit;
 }
 .campo input:focus { outline: none; border-color: var(--inova-primary); }
 .campo textarea {
   width: 100%; box-sizing: border-box; padding: 12px 14px; resize: vertical;
   border-radius: 14px; border: 1px solid var(--glass-border);
-  background: rgba(255,255,255,0.75); font-size: 16px; color: inherit; font-family: inherit;
+  background: var(--sup-campo); font-size: 16px; color: inherit; font-family: inherit;
 }
 .campo textarea:focus { outline: none; border-color: var(--inova-primary); }
 
@@ -743,7 +743,7 @@ onMounted(cargar);
 }
 .foto-add {
   width: 82px; height: 82px; border-radius: 13px; cursor: pointer;
-  border: 2px dashed rgba(0,0,0,0.18); background: transparent; color: inherit;
+  border: 2px dashed var(--linea); background: transparent; color: inherit;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
   font-size: 11px; font-weight: 600; opacity: 0.6;
 }
@@ -754,7 +754,7 @@ onMounted(cargar);
 .firma {
   width: 100%; height: 150px; display: block; touch-action: none;
   border-radius: 14px; border: 1px solid var(--glass-border);
-  background: rgba(255,255,255,0.85);
+  background: var(--sup-campo);
 }
 .firma-hint {
   position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
@@ -762,7 +762,7 @@ onMounted(cargar);
 }
 .firma-limpiar {
   position: absolute; right: 8px; top: 8px; border: none; cursor: pointer;
-  background: rgba(0,0,0,0.06); border-radius: 9px; padding: 5px 11px;
+  background: var(--sup-sutil); border-radius: 9px; padding: 5px 11px;
   font-size: 12px; font-weight: 700; color: inherit;
 }
 .hoja-nota { font-size: 12px; opacity: 0.5; margin: 0; line-height: 1.4; }

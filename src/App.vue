@@ -49,12 +49,15 @@ import { api } from '@/js/api.js';
 import { store, setSesion, setMotivos, sesionCacheada, cachearSesion } from '@/js/store.js';
 import { flush as flushCola } from '@/js/cola.js';
 import { sincronizar as sincronizarPush } from '@/js/push.js';
+import { esOscuro, conectarF7 } from '@/js/tema.js';
 import LoginPage from '@/pages/LoginPage.vue';
 
 const f7params = reactive({
   name: 'InovaTrack',
   theme: 'ios',
-  darkMode: false,
+  // Arranca con la preferencia ya resuelta: Framework7 gestiona la clase .dark
+  // por su cuenta y, si aquí dijera `false`, borraría la que puso iniciarTema().
+  darkMode: esOscuro(),
   colors: { primary: '#5b5bd6' },
   routes,
   view: { iosDynamicNavbar: true, pushState: false },
@@ -109,6 +112,10 @@ function show(id) {
 // pantalla cambia de tab por código.
 onMounted(async () => {
   f7ready(() => {
+    // Cambiar la apariencia desde Perfil tiene que mover también el darkMode
+    // interno de Framework7, o sus componentes se quedan en el tema anterior.
+    conectarF7((oscuro) => f7.setDarkMode(oscuro));
+
     f7.on('tabShow', (tabEl) => {
       const id = tabEl?.id?.replace('view-', '');
       if (id) active.value = id;

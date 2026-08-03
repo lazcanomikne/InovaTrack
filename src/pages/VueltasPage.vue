@@ -509,7 +509,7 @@ onMounted(cargar);
 .pill-lectura i { font-size: 11px; }
 .pill-cola {
   display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0;
-  background: rgba(255,159,10,0.18); color: #b26a00;
+  background: var(--ambar-bg); color: var(--ambar-fg);
   padding: 5px 11px; border-radius: 999px; font-size: 12px; font-weight: 700;
   margin-top: 2px;
 }
@@ -529,7 +529,7 @@ onMounted(cargar);
 .contadores { display: flex; gap: 8px; padding: 0 16px 12px; }
 .cont {
   flex: 1; border-radius: 14px; padding: 9px 4px; text-align: center;
-  background: rgba(255,255,255,0.5);
+  background: var(--sup-campo);
   -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
   border: 1px solid var(--glass-border);
 }
@@ -543,7 +543,7 @@ onMounted(cargar);
 .buscador {
   display: flex; align-items: center; gap: 8px; margin: 0 16px 12px;
   padding: 0 12px; height: 42px; border-radius: 14px;
-  background: rgba(255,255,255,0.6); border: 1px solid var(--glass-border);
+  background: var(--sup-campo); border: 1px solid var(--glass-border);
 }
 .buscador i { font-size: 17px; opacity: 0.4; }
 .buscador input {
@@ -573,7 +573,7 @@ onMounted(cargar);
 .orden {
   flex-shrink: 0; min-width: 21px; height: 21px; border-radius: 7px;
   display: flex; align-items: center; justify-content: center;
-  background: rgba(0,0,0,0.07); font-size: 11px; font-weight: 700;
+  background: var(--sup-sutil); font-size: 11px; font-weight: 700;
 }
 .cliente {
   flex: 1; min-width: 0; font-size: 16px; font-weight: 700; letter-spacing: -0.01em;
@@ -593,11 +593,11 @@ onMounted(cargar);
 
 .chip {
   font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 999px;
-  background: rgba(0,0,0,0.07);
+  background: var(--sup-sutil);
 }
-.chip.manual { background: rgba(255,159,10,0.18); color: #b26a00; }
+.chip.manual { background: var(--ambar-bg); color: var(--ambar-fg); }
 .chip.factura { background: rgba(91,91,214,0.14); color: var(--inova-primary); }
-.chip.reintento { background: rgba(255,159,10,0.2); color: #b26a00; }
+.chip.reintento { background: var(--ambar-bg); color: var(--ambar-fg); }
 .chip.critica { background: #ff453a; color: #fff; }
 
 /* Botones grandes: se usan de pie, en la calle, con una mano. */
@@ -612,7 +612,7 @@ onMounted(cargar);
 .acc i { font-size: 16px; }
 .acc.ok { background: #30d158; }
 .acc.mal { background: #ff453a; }
-.acc.mas { flex: 0 0 48px; background: rgba(0,0,0,0.35); }
+.acc.mas { flex: 0 0 48px; background: var(--btn-neutro); }
 
 /* ---------------- Avisos ---------------- */
 .aviso { margin: 30px 16px; padding: 28px 20px; border-radius: 18px; text-align: center; }

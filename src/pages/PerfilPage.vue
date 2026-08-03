@@ -83,6 +83,22 @@
       </ul>
     </div>
 
+    <!-- Apariencia: claro / oscuro / seguir al sistema -->
+    <div class="block-title">Apariencia</div>
+    <div class="color-row">
+      <button
+        v-for="a in APARIENCIAS"
+        :key="a.id"
+        type="button"
+        class="tema-chip"
+        :class="{ activo: aparienciaId === a.id }"
+        @click="elegirApariencia(a.id)"
+      >
+        <span class="tema-circulo">{{ a.emoji }}</span>
+        <span class="color-nombre">{{ a.nombre }}</span>
+      </button>
+    </div>
+
     <!-- Temática (figuras de fondo) -->
     <div class="block-title">Temática</div>
     <div class="color-row">
@@ -163,7 +179,11 @@ import { f7 } from 'framework7-vue';
 import { api } from '@/js/api.js';
 import { store, limpiarSesion } from '@/js/store.js';
 import { estadoPush, activarPush, desactivarPush } from '@/js/push.js';
-import { TEMATICAS, COLORES, tematicaActual, colorActual, aplicarTematica, aplicarColor } from '@/js/tema.js';
+import {
+  TEMATICAS, COLORES, APARIENCIAS,
+  tematicaActual, colorActual, aparienciaActual,
+  aplicarTematica, aplicarColor, aplicarApariencia,
+} from '@/js/tema.js';
 import { estadoActualizacion, comprobarActualizacion, aplicarActualizacion, reinstalarApp } from '@/js/actualizacion.js';
 
 const usuario = computed(() => store.usuario ?? { nombre: '', rol: '', usuario: '', vehiculo: '', ruta: '' });
@@ -179,9 +199,14 @@ const iniciales = computed(() =>
 
 const actualizando = ref(false);
 
-// Apariencia: temática (figuras) + color, independientes.
+// Apariencia: claro/oscuro + temática (figuras) + color, independientes.
 const tematicaId = ref(tematicaActual());
 const colorId = ref(colorActual());
+const aparienciaId = ref(aparienciaActual());
+function elegirApariencia(id) {
+  aparienciaId.value = id;
+  aplicarApariencia(id);
+}
 function elegirTematica(id) {
   tematicaId.value = id;
   aplicarTematica(id);
@@ -336,7 +361,7 @@ onMounted(async () => {
 .tema-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 0 16px; }
 .tema-card {
   position: relative; display: flex; flex-direction: column; align-items: center; gap: 8px;
-  border: 1.5px solid rgba(120, 120, 128, 0.18); background: rgba(255, 255, 255, 0.65);
+  border: 1.5px solid var(--linea); background: var(--sup-campo);
   -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
   border-radius: 18px; padding: 14px 10px; cursor: pointer; transition: all 0.15s ease;
 }
@@ -350,19 +375,19 @@ onMounted(async () => {
 }
 .tema-circulo {
   width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
-  font-size: 25px; background: rgba(120, 120, 128, 0.12); border: 2px solid rgba(255, 255, 255, 0.7);
+  font-size: 25px; background: var(--sup-sutil); border: 2px solid var(--borde-chip);
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1); transition: transform 0.12s ease;
 }
 .tema-chip.activo .tema-circulo { transform: scale(1.08); outline: 2.5px solid var(--inova-primary); outline-offset: 2px; background: rgba(var(--f7-theme-color-rgb), 0.14); }
 .tema-chip:active .tema-circulo { transform: scale(0.94); }
 .color-muestra {
   width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.18); border: 2px solid rgba(255, 255, 255, 0.7); transition: transform 0.12s ease;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.18); border: 2px solid var(--borde-chip); transition: transform 0.12s ease;
 }
 .color-muestra i { color: #fff; font-size: 22px; font-weight: 800; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3); }
 .color-chip.activo .color-muestra { transform: scale(1.08); outline: 2.5px solid var(--inova-primary); outline-offset: 2px; }
 .color-chip:active .color-muestra { transform: scale(0.94); }
-.color-nombre { font-size: 11px; font-weight: 600; color: #6b6780; white-space: nowrap; }
+.color-nombre { font-size: 11px; font-weight: 600; color: var(--texto-tenue); white-space: nowrap; }
 .tema-chip .color-nombre { white-space: normal; line-height: 1.15; text-align: center; }
 .perfil-nombre { font-size: 20px; font-weight: 800; }
 .perfil-rol { opacity: 0.7; font-size: 14px; }
@@ -372,6 +397,6 @@ onMounted(async () => {
 .badge-nuevo {
   display: inline-flex; align-items: center; margin-left: 6px;
   font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 999px;
-  background: rgba(48, 209, 88, 0.18); color: #1f8a3d;
+  background: var(--verde-bg); color: var(--verde-fg);
 }
 </style>
