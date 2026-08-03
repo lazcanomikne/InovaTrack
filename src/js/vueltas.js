@@ -12,6 +12,22 @@ export const ESTADOS = {
 export const estadoInfo = (e) => ESTADOS[e] ?? ESTADOS.pendiente;
 export const estaAbierta = (v) => v.estado === 'pendiente' || v.estado === 'revision';
 
+/**
+ * Tally de presentación (espejo de `contar()` en api/_vueltas.js), para
+ * refrescar los contadores al instante tras una mutación optimista de la cola
+ * offline, sin esperar la respuesta del servidor.
+ */
+export function contarLocal(vueltas) {
+  const c = { total: vueltas.length, pendientes: 0, entregadas: 0, no_entregadas: 0, reprogramadas: 0 };
+  for (const v of vueltas) {
+    if (v.estado === 'pendiente' || v.estado === 'revision') c.pendientes++;
+    else if (v.estado === 'entregada') c.entregadas++;
+    else if (v.estado === 'no_entregada') c.no_entregadas++;
+    else if (v.estado === 'reprogramada') c.reprogramadas++;
+  }
+  return c;
+}
+
 /** 3 o más intentos = crítica (Módulo 5). */
 export const esCritica = (v) => Number(v.intento || 1) >= 3;
 

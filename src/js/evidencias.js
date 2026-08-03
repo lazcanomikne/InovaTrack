@@ -50,22 +50,27 @@ export function firmaABlob(canvas) {
 }
 
 /**
- * Sube un blob a Vercel Blob y registra la evidencia en la vuelta.
- * Requiere conexión; sin ella, la cola offline guardará el blob y hará esto
- * mismo al recuperar señal.
+ * Sube un blob a Vercel Blob (sin registrarlo todavía). Requiere conexión.
+ * La cola offline (cola.js) reutiliza esta función al sincronizar: sube el
+ * blob que guardó en IndexedDB y sólo entonces manda la operación 'evidencia'
+ * a /api/sync con la url ya resuelta.
  */
-export async function subirEvidencia(vueltaId, blob, { tipo, nombre, ocurrido_en }) {
+export async function subirBlobEvidencia(vueltaId, blob, nombre) {
   const archivo = new File([blob], nombre, { type: blob.type });
-
   const subido = await upload(nombre, archivo, {
     access: 'public',
     handleUploadUrl: '/api/blob-upload',
     clientPayload: JSON.stringify({ vuelta_id: vueltaId }),
   });
+  return subido.url;
+}
 
+/** Sube un blob y registra la evidencia en la vuelta en un solo paso (con señal). */
+export async function subirEvidencia(vueltaId, blob, { tipo, nombre, ocurrido_en }) {
+  const url = await subirBlobEvidencia(vueltaId, blob, nombre);
   return api.vueltas.evidencia(vueltaId, {
     tipo,
-    url: subido.url,
+    url,
     ocurrido_en: ocurrido_en ?? new Date().toISOString(),
     client_uuid: crypto.randomUUID(),
   });
