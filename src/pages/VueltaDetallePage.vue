@@ -215,6 +215,63 @@
         </div>
       </div>
 
+      <!-- ── Hoja de reprogramar ──────────────────────────────────── -->
+      <div v-if="reprogramando" class="hoja-fondo" @click.self="cerrarReprogramar">
+        <div class="hoja hoja-chica">
+          <div class="hoja-barra">
+            <button type="button" class="hoja-x" @click="cerrarReprogramar">Cancelar</button>
+            <strong>Reprogramar</strong>
+            <button type="button" class="hoja-ok" @click="confirmarReprogramar">Mover</button>
+          </div>
+          <div class="hoja-cuerpo">
+            <label class="campo">
+              <span class="campo-lbl">Nueva fecha</span>
+              <input v-model="fechaDestino" type="date" :min="fechaMinimaReprogramar" />
+            </label>
+            <p class="hoja-nota">
+              La vuelta original queda registrada como reprogramada, con su historial intacto.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Hoja de edición ──────────────────────────────────────── -->
+      <div v-if="editando" class="hoja-fondo" @click.self="cerrarEdicion">
+        <div class="hoja">
+          <div class="hoja-barra">
+            <button type="button" class="hoja-x" @click="cerrarEdicion">Cancelar</button>
+            <strong>Editar datos</strong>
+            <button type="button" class="hoja-ok" @click="guardarEdicion">Listo</button>
+          </div>
+          <div class="hoja-cuerpo">
+            <label class="campo">
+              <span class="campo-lbl">Cliente</span>
+              <input v-model="formEdicion.cliente_nombre" type="text" autocapitalize="words" placeholder="Nombre del cliente" />
+            </label>
+            <label class="campo">
+              <span class="campo-lbl">Destinatario</span>
+              <input v-model="formEdicion.destinatario" type="text" autocapitalize="words" placeholder="Quién recibe" />
+            </label>
+            <label class="campo">
+              <span class="campo-lbl">Contacto</span>
+              <input v-model="formEdicion.contacto" type="text" autocapitalize="words" placeholder="Persona de contacto" />
+            </label>
+            <label class="campo">
+              <span class="campo-lbl">Teléfono</span>
+              <input v-model="formEdicion.telefono" type="tel" placeholder="10 dígitos" />
+            </label>
+            <label class="campo">
+              <span class="campo-lbl">Dirección</span>
+              <input v-model="formEdicion.direccion" type="text" placeholder="Calle, número, colonia" />
+            </label>
+            <label class="campo">
+              <span class="campo-lbl">Notas</span>
+              <textarea v-model="formEdicion.notas" rows="3" placeholder="Notas para la entrega"></textarea>
+            </label>
+          </div>
+        </div>
+      </div>
+
       <!-- Visor de evidencias -->
       <div v-if="viendo" class="visor" @click.self="viendo = null">
         <div class="visor-barra">
@@ -228,7 +285,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
+import { ref, reactive, computed, onMounted, onUnmounted, nextTick } from 'vue';
 import { f7 } from 'framework7-vue';
 import { api } from '@/js/api.js';
 import { store, setMotivos } from '@/js/store.js';
@@ -455,25 +512,28 @@ async function registrarNoEntrega(motivo) {
   else guardar(null);
 }
 
+/* ------------------------- Hoja de reprogramar ----------------------- */
+// Un solo selector nativo (<input type="date">), precargado a mañana: el
+// caso común es un toque, y el poco común no exige teclear "AAAA-MM-DD".
+const reprogramando = ref(false);
+const fechaDestino = ref('');
+const fechaMinimaReprogramar = computed(() => sumarDias(v.value?.fecha ?? hoy(), 1));
+
 function reprogramar() {
-  const manana = sumarDias(v.value.fecha, 1);
-  f7.dialog.create({
-    title: 'Reprogramar',
-    buttons: [
-      { text: `Mañana (${etiquetaFecha(manana)})`, onClick: () => moverA(manana) },
-      { text: 'Elegir otra fecha', onClick: elegirFecha },
-      { text: 'Cancelar', color: 'gray' },
-    ],
-    verticalButtons: true,
-  }).open();
+  fechaDestino.value = fechaMinimaReprogramar.value;
+  reprogramando.value = true;
 }
 
-function elegirFecha() {
-  f7.dialog.prompt('Fecha destino (AAAA-MM-DD)', 'Reprogramar', (txt) => {
-    const f = String(txt ?? '').trim();
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(f)) return f7.dialog.alert('Formato: 2026-07-30', 'Fecha inválida');
-    moverA(f);
-  }, null, sumarDias(v.value.fecha, 1));
+function cerrarReprogramar() {
+  reprogramando.value = false;
+}
+
+async function confirmarReprogramar() {
+  if (!fechaDestino.value || fechaDestino.value < fechaMinimaReprogramar.value) {
+    return f7.dialog.alert('Elige una fecha posterior a hoy.', 'Fecha inválida');
+  }
+  await moverA(fechaDestino.value);
+  reprogramando.value = false;
 }
 
 async function moverA(fecha_destino) {
@@ -483,21 +543,32 @@ async function moverA(fecha_destino) {
   f7.toast.create({ text: `Movida a ${etiquetaFecha(fecha_destino)} ✓`, closeTimeout: 1600, position: 'center' }).open();
 }
 
+/* --------------------------- Hoja de edición -------------------------- */
+// Los mismos campos que acepta el backend (EDITABLES en api/_vueltas.js).
+const editando = ref(false);
+const formEdicion = reactive({
+  cliente_nombre: '', destinatario: '', contacto: '', telefono: '', direccion: '', notas: '',
+});
+
 function editar() {
   const d = v.value;
-  f7.dialog.prompt('Dirección', 'Editar', (dir) => {
-    f7.dialog.prompt('Teléfono', 'Editar', async (telf) => {
-      f7.dialog.prompt('Notas', 'Editar', async (notas) => {
-        const payload = {
-          direccion: dir ?? d.direccion,
-          telefono: telf ?? d.telefono,
-          notas: notas ?? d.notas,
-        };
-        await cola.encolar({ tipo: 'editar', vuelta_id: id, payload });
-        await refrescarVista();
-      }, null, d.notas ?? '');
-    }, null, d.telefono ?? '');
-  }, null, d.direccion ?? '');
+  formEdicion.cliente_nombre = d.cliente_nombre ?? '';
+  formEdicion.destinatario = d.destinatario ?? '';
+  formEdicion.contacto = d.contacto ?? '';
+  formEdicion.telefono = d.telefono ?? '';
+  formEdicion.direccion = d.direccion ?? '';
+  formEdicion.notas = d.notas ?? '';
+  editando.value = true;
+}
+
+function cerrarEdicion() {
+  editando.value = false;
+}
+
+async function guardarEdicion() {
+  await cola.encolar({ tipo: 'editar', vuelta_id: id, payload: { ...formEdicion } });
+  editando.value = false;
+  await refrescarVista();
 }
 
 onMounted(cargar);
@@ -623,6 +694,8 @@ onMounted(cargar);
   background: var(--aurora-color, #f4f2fb);
   border-radius: 22px 22px 0 0; overflow: hidden;
 }
+/* La de reprogramar sólo tiene un campo: no necesita ocupar casi toda la pantalla. */
+.hoja.hoja-chica { max-height: none; }
 .hoja-barra {
   display: flex; align-items: center; justify-content: space-between;
   padding: 14px 16px; border-bottom: 1px solid rgba(0,0,0,0.08);
@@ -644,6 +717,12 @@ onMounted(cargar);
   background: rgba(255,255,255,0.75); font-size: 16px; color: inherit;
 }
 .campo input:focus { outline: none; border-color: var(--inova-primary); }
+.campo textarea {
+  width: 100%; box-sizing: border-box; padding: 12px 14px; resize: vertical;
+  border-radius: 14px; border: 1px solid var(--glass-border);
+  background: rgba(255,255,255,0.75); font-size: 16px; color: inherit; font-family: inherit;
+}
+.campo textarea:focus { outline: none; border-color: var(--inova-primary); }
 
 .fotos { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; }
 .foto-mini { position: relative; width: 82px; height: 82px; border-radius: 13px; overflow: hidden; }

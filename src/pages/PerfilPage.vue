@@ -261,27 +261,22 @@ function salir() {
   });
 }
 
+// Con registerType:'autoUpdate' el SW ya se actualiza solo (skipWaiting +
+// clientsClaim en vite.config.js): no hace falta desregistrarlo ni borrar
+// las cachés a mano —eso incluso podía dejar al chofer sin SW por un
+// instante—. reg.update() sólo pide al navegador revisar si hay un sw.js
+// nuevo; si lo hay, se activa solo y la recarga trae ya lo último.
 async function buscarActualizacion() {
   if (actualizando.value) return;
   actualizando.value = true;
-  f7.toast.create({ text: 'Actualizando app…', position: 'center', closeTimeout: 4000 }).open();
-
-  const recargar = () => location.replace(location.pathname + '?v=' + Date.now());
-  const salvavidas = setTimeout(recargar, 3500);
+  f7.toast.create({ text: 'Buscando actualización…', position: 'center', closeTimeout: 4000 }).open();
 
   try {
-    if (window.caches) {
-      const keys = await caches.keys();
-      await Promise.all(keys.map((k) => caches.delete(k).catch(() => {})));
-    }
-    if ('serviceWorker' in navigator) {
-      const regs = await navigator.serviceWorker.getRegistrations();
-      await Promise.all(regs.map((r) => r.unregister().catch(() => {})));
-    }
-  } catch (_) { /* ignore */ }
+    const reg = await navigator.serviceWorker?.getRegistration();
+    await reg?.update();
+  } catch { /* si falla la revisión, igual recargamos con lo que haya */ }
 
-  clearTimeout(salvavidas);
-  recargar();
+  location.reload();
 }
 
 onMounted(async () => {
