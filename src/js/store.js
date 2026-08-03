@@ -21,6 +21,10 @@ export const store = reactive({
   // Cola offline (Módulo 7): lo actualiza cola.js, lo lee el badge global.
   pendientesSync: 0,
   sinConexion: typeof navigator !== 'undefined' ? !navigator.onLine : false,
+
+  // Refleja el día que se está viendo en Mis vueltas: la pastilla de
+  // navegación lo usa para atenuar "Nueva" en un día pasado (sólo consulta).
+  soloLectura: false,
 });
 
 export function refrescar() {

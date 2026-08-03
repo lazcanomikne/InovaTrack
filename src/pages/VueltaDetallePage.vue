@@ -669,7 +669,7 @@ onMounted(cargar);
 .hito-gps i { font-size: 11px; }
 
 /* ---------------- Acciones ---------------- */
-.acciones-pie { padding: 20px 16px calc(110px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 9px; }
+.acciones-pie { padding: 20px 16px calc(125px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 9px; }
 .acciones-fila { display: flex; gap: 9px; }
 .btn-grande {
   flex: 1; height: 54px; border: none; border-radius: 16px; cursor: pointer;

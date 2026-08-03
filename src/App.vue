@@ -25,7 +25,11 @@
             :key="t.id"
             type="button"
             class="fnav-item"
-            :class="{ active: active === t.id, create: t.id === 'captura' }"
+            :class="{
+              active: active === t.id,
+              create: t.id === 'captura',
+              atenuado: t.id === 'captura' && store.soloLectura,
+            }"
             @click="show(t.id)"
           >
             <i class="f7-icons">{{ t.icon }}</i>
@@ -60,8 +64,13 @@ const f7params = reactive({
 // Ítems de la pila. Al agregar un módulo, añade aquí su entrada (y su
 // <f7-view id="view-<id>"> arriba). Si hay un ítem de "crear", ponle
 // id 'captura' o añade la clase `create` para el botón en gradiente.
+//
+// 'captura' es un caso especial: NO tiene <f7-view> propia, es una acción
+// (abrir la captura de vuelta manual en Mis vueltas), no un tab. show()
+// la trata aparte antes de intentar cambiar de vista.
 const tabs = [
   { id: 'vueltas', label: 'Mis vueltas', icon: 'square_list_fill' },
+  { id: 'captura', label: 'Nueva', icon: 'plus' },
   { id: 'perfil', label: 'Perfil', icon: 'person_fill' },
 ];
 
@@ -79,6 +88,20 @@ function modalRelevante(m) {
 }
 
 function show(id) {
+  // 'captura' no es un tab: f7.tab.show(`#view-captura`) reventaría porque no
+  // existe esa <f7-view>. Es una acción que vive en VueltasPage (Módulo 3):
+  // aquí sólo la despachamos por el bus de eventos de Framework7.
+  if (id === 'captura') {
+    if (store.soloLectura) {
+      f7.toast.create({ text: 'Los días pasados son sólo de consulta.', closeTimeout: 1800, position: 'center' }).open();
+      return;
+    }
+    // Si el chofer está en Perfil, primero lo llevamos a Mis vueltas: la
+    // hoja de captura vive ahí y no tendría sentido abrirla sobre Perfil.
+    if (active.value !== 'vueltas') f7.tab.show('#view-vueltas');
+    f7.emit('abrirCaptura');
+    return;
+  }
   f7.tab.show(`#view-${id}`);
 }
 
