@@ -66,7 +66,7 @@ export function crearDictado({ lang = 'es-MX', onTexto, onError, onFin } = {}) {
       finalAcumulado = '';
       reintentos = 0;
       activo = true;
-      try { rec.start(); } catch (e) { activo = false; onError?.('No se pudo iniciar el dictado.'); }
+      try { rec.start(); } catch { activo = false; onError?.('No se pudo iniciar el dictado.'); }
     },
     detener() {
       activo = false;

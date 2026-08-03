@@ -140,7 +140,6 @@
 import { ref, computed, onMounted } from 'vue';
 import { f7 } from 'framework7-vue';
 import { api } from '@/js/api.js';
-import { store } from '@/js/store.js';
 import {
   hoy, sumarDias, partesFecha, etiquetaFecha, horaCorta,
   estadoInfo, estaAbierta, esCritica, tituloVuelta, direccionCorta, coincide,
