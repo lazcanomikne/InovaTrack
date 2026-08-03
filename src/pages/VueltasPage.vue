@@ -142,6 +142,7 @@
               <i class="f7-icons">{{ estadoInfo(v.estado).icono }}</i>
               {{ estadoInfo(v.estado).texto }}
             </span>
+            <span v-if="v.tipo && v.tipo !== 'entrega'" class="chip tipo">{{ etiquetaTipo(v.tipo) }}</span>
             <span v-if="v.origen === 'manual'" class="chip manual">Manual</span>
             <span v-if="v.factura_numero" class="chip factura">{{ v.factura_numero }}</span>
             <span v-if="v.cerrada_en" class="hora">{{ horaCorta(v.cerrada_en) }}</span>
@@ -162,6 +163,9 @@
         </div>
       </div>
     </div>
+
+    <!-- Captura guiada (tipo → factura/manual → escáner) -->
+    <CapturaSheet v-model:abierto="capturaAbierta" :fecha="fecha" @crear="crearVuelta" />
   </f7-page>
 </template>
 
@@ -172,6 +176,7 @@ import { api } from '@/js/api.js';
 import { store, setMotivos } from '@/js/store.js';
 import * as cola from '@/js/cola.js';
 import * as haptics from '@/js/haptics.js';
+import CapturaSheet from '@/pages/CapturaSheet.vue';
 import {
   hoy, sumarDias, partesFecha, etiquetaFecha, horaCorta,
   estadoInfo, estaAbierta, esCritica, tituloVuelta, direccionCorta, coincide, contarLocal,
@@ -209,6 +214,8 @@ function alternarFiltro(id) {
 }
 
 const etiquetaFiltro = computed(() => FILTROS.find((f) => f.id === filtro.value)?.texto ?? '');
+
+const etiquetaTipo = (t) => ({ recoleccion: 'Recolección', otro: 'Otros' }[t] ?? '');
 
 function pasaFiltro(v) {
   if (filtro.value === 'todo') return true;
@@ -503,16 +510,20 @@ async function pasarAManana(v, yaCerrada = false) {
   f7.dialog.confirm(`¿Pasar «${tituloVuelta(v)}» a mañana?`, 'Reprogramar', hacerlo);
 }
 
-function nuevaManual() {
-  f7.dialog.prompt('Cliente o descripción', 'Vuelta manual', async (nombre) => {
-    if (!nombre?.trim()) return;
-    const payload = { origen: 'manual', cliente_nombre: nombre.trim(), fecha: fecha.value, ocurrido_en: new Date().toISOString() };
-    const client_uuid = crypto.randomUUID();
-    vueltas.value = [...vueltas.value, cola.vueltaTemporal(client_uuid, payload)];
-    contadores.value = contarLocal(vueltas.value);
-    await cola.encolar({ tipo: 'crear', payload, client_uuid });
-    f7.toast.create({ text: 'Vuelta agregada ✓', closeTimeout: 1400, position: 'center' }).open();
-  });
+// La pastilla "Nueva" abre la hoja de captura guiada (tipo → factura/manual →
+// escáner). Toda la elección vive en CapturaSheet; aquí sólo se recibe el
+// payload ya armado y se aplica igual que cualquier acción offline-first.
+const capturaAbierta = ref(false);
+function nuevaManual() { capturaAbierta.value = true; }
+
+async function crearVuelta(datos) {
+  const payload = { ...datos, fecha: fecha.value, ocurrido_en: new Date().toISOString() };
+  const client_uuid = crypto.randomUUID();
+  vueltas.value = [...vueltas.value, cola.vueltaTemporal(client_uuid, payload)];
+  contadores.value = contarLocal(vueltas.value);
+  await cola.encolar({ tipo: 'crear', payload, client_uuid });
+  const comoSe = { entrega: 'Entrega', recoleccion: 'Recolección', otro: 'Vuelta' }[datos.tipo_vuelta] || 'Vuelta';
+  f7.toast.create({ text: `${comoSe} agregada ✓`, closeTimeout: 1400, position: 'center' }).open();
 }
 
 function abrirDetalle(v) {
@@ -731,6 +742,7 @@ onMounted(cargar);
   font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 999px;
   background: var(--sup-sutil);
 }
+.chip.tipo { background: rgba(var(--f7-theme-color-rgb), 0.16); color: var(--inova-primary); }
 .chip.manual { background: var(--ambar-bg); color: var(--ambar-fg); }
 .chip.factura { background: rgba(91,91,214,0.14); color: var(--inova-primary); }
 .chip.reintento { background: var(--ambar-bg); color: var(--ambar-fg); }

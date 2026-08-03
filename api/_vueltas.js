@@ -45,6 +45,9 @@ export function transicionValida(desde, hacia) {
 /** Cada chofer sólo ve y opera lo suyo (Módulo 1). Oficina/dirección ven todo. */
 export const esOficina = (u) => u?.rol === 'oficina' || u?.rol === 'direccion';
 
+// Qué va a hacer el chofer en la parada (columna `tipo`, migración 0004).
+export const TIPOS = ['entrega', 'recoleccion', 'otro'];
+
 export async function vueltaDe(id, usuario) {
   const { rows } = await db().execute({
     sql: 'SELECT * FROM vueltas WHERE id = ?',
@@ -250,16 +253,21 @@ async function crearVueltaEn(ejecutor, datos, usuario) {
     orden = Number(rows[0].sig);
   }
 
+  // En el protocolo de sync la clave `tipo` ya significa el TIPO DE OPERACIÓN
+  // (crear/entregar/…): el tipo de la vuelta viaja como `tipo_vuelta` para no
+  // pisarlo al aplanar el payload (ver src/js/cola.js#aOperacionSync).
+  const tipo = TIPOS.includes(datos.tipo_vuelta) ? datos.tipo_vuelta : 'entrega';
+
   const { rows } = await c.execute({
     sql: `INSERT INTO vueltas
-            (client_uuid, chofer_id, fecha, orden, origen, estado, intento, vuelta_padre_id,
+            (client_uuid, chofer_id, fecha, orden, origen, tipo, estado, intento, vuelta_padre_id,
              factura_folio, factura_numero, cliente_codigo, cliente_nombre, destinatario,
              contacto, telefono, direccion, notas, creado_por)
-          VALUES (?,?,?,?,?, 'pendiente', ?,?, ?,?,?,?,?, ?,?,?,?, ?)
+          VALUES (?,?,?,?,?,?, 'pendiente', ?,?, ?,?,?,?,?, ?,?,?,?, ?)
           RETURNING *`,
     args: [
       datos.client_uuid ?? null, chofer, fecha, orden,
-      datos.origen === 'manual' ? 'manual' : 'factura',
+      datos.origen === 'manual' ? 'manual' : 'factura', tipo,
       Number(datos.intento) || 1, datos.vuelta_padre_id ?? null,
       datos.factura_folio ?? null, datos.factura_numero ?? null,
       datos.cliente_codigo ?? null, datos.cliente_nombre ?? null, datos.destinatario ?? null,
@@ -406,6 +414,7 @@ export async function reprogramarVuelta(vuelta, datos, usuario) {
       client_uuid: datos.client_uuid ?? null,
       fecha: destino,
       origen: vuelta.origen,
+      tipo_vuelta: vuelta.tipo, // la hija conserva el tipo de la madre
       intento: Number(vuelta.intento || 1) + 1,
       vuelta_padre_id: vuelta.id,
       factura_folio: vuelta.factura_folio,

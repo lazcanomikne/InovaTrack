@@ -1,7 +1,13 @@
 // Runner de migraciones versionado para Turso (libSQL).
 //
-//   npm run db:migrate          → aplica las migraciones pendientes (no destructivas)
-//   npm run db:migrate:reset    → además permite aplicar las destructivas (DROP)
+//   npm run db:migrate                    → aplica las pendientes (no destructivas)
+//   npm run db:migrate:reset              → además permite aplicar las destructivas (DROP)
+//   npm run db:migrate -- --baseline <n>  → marca como aplicadas las migraciones
+//                                           hasta <n> (incluida) SIN ejecutarlas
+//
+// `--baseline` sirve para adoptar una base que ya tenía el esquema aplicado a
+// mano antes de que existiera este runner: registra el historial sin volver a
+// correr los DROP/CREATE, para que las pendientes reales se apliquen normal.
 //
 // Cada archivo de migrations/*.sql se aplica UNA sola vez: al terminar se
 // registra por nombre en `schema_migrations`, y correr el runner de nuevo es
@@ -21,6 +27,8 @@ const DIR_MIGRACIONES = join(__dirname, '..', 'migrations');
 const MARCADOR_DESTRUCTIVO = '-- migrate:destructivo';
 
 const reset = process.argv.includes('--reset');
+const iBase = process.argv.indexOf('--baseline');
+const baselineHasta = iBase >= 0 ? process.argv[iBase + 1] : null;
 
 const url = process.env.TURSO_DATABASE_URL;
 const authToken = process.env.TURSO_AUTH_TOKEN;
@@ -42,6 +50,29 @@ const { rows: aplicadas } = await client.execute('SELECT nombre FROM schema_migr
 const yaAplicadas = new Set(aplicadas.map((r) => r.nombre));
 
 const archivos = readdirSync(DIR_MIGRACIONES).filter((f) => f.endsWith('.sql')).sort();
+
+// Baseline: registra sin ejecutar todo lo que sea <= al archivo dado.
+if (baselineHasta) {
+  if (!archivos.includes(baselineHasta)) {
+    console.error(`✗ No existe la migración "${baselineHasta}".`);
+    process.exit(1);
+  }
+  const marcar = archivos.filter((f) => f <= baselineHasta && !yaAplicadas.has(f));
+  if (!marcar.length) {
+    console.log('✓ Nada que marcar: ya estaban registradas.');
+    process.exit(0);
+  }
+  for (const f of marcar) {
+    await client.execute({
+      sql: "INSERT INTO schema_migrations (nombre, aplicada_en) VALUES (?, datetime('now'))",
+      args: [f],
+    });
+    console.log(`= ${f} marcada como aplicada (sin ejecutar).`);
+  }
+  console.log('✓ Baseline listo. Corre `npm run db:migrate` para aplicar lo pendiente.');
+  process.exit(0);
+}
+
 const pendientes = archivos.filter((f) => !yaAplicadas.has(f));
 
 if (!pendientes.length) {
