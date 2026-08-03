@@ -1,5 +1,5 @@
 <template>
-  <f7-page name="vueltas" @page:afterin="cargar">
+  <f7-page name="vueltas" class="pagina-vueltas" @page:afterin="cargar">
     <!-- ── Barra de días (Módulo 6) ───────────────────────────────────── -->
     <div class="barra-dias glass-strong">
       <button type="button" class="dia-nav" @click="moverDias(-1)" aria-label="Días anteriores">
@@ -54,12 +54,20 @@
       <button v-if="fecha !== hoyStr" type="button" class="btn-hoy" @click="irA(hoyStr)">Hoy</button>
     </div>
 
-    <!-- ── Contadores (Módulo 4) ──────────────────────────────────────── -->
+    <!-- ── Contadores (Módulo 4): además filtran la lista ─────────────── -->
     <div class="contadores">
-      <div class="cont"><span class="cont-num">{{ contadores.total }}</span><span class="cont-lbl">Total</span></div>
-      <div class="cont pend"><span class="cont-num">{{ contadores.pendientes }}</span><span class="cont-lbl">Pendientes</span></div>
-      <div class="cont ok"><span class="cont-num">{{ contadores.entregadas }}</span><span class="cont-lbl">Entregadas</span></div>
-      <div class="cont mal"><span class="cont-num">{{ contadores.no_entregadas }}</span><span class="cont-lbl">No entreg.</span></div>
+      <button
+        v-for="f in FILTROS"
+        :key="f.id"
+        type="button"
+        class="cont"
+        :class="[f.tono, { act: filtro === f.id }]"
+        :aria-pressed="filtro === f.id"
+        @click="alternarFiltro(f.id)"
+      >
+        <span class="cont-num">{{ contadores[f.campo] }}</span>
+        <span class="cont-lbl">{{ f.texto }}</span>
+      </button>
     </div>
 
     <!-- ── Buscador (Módulo 8) ────────────────────────────────────────── -->
@@ -84,7 +92,11 @@
 
     <div v-else-if="!filtradas.length" class="aviso glass">
       <div class="aviso-t">Sin resultados</div>
-      <div class="aviso-s">Nada coincide con «{{ busqueda }}».</div>
+      <div v-if="busqueda" class="aviso-s">Nada coincide con «{{ busqueda }}».</div>
+      <div v-else class="aviso-s">
+        Ninguna vuelta está en «{{ etiquetaFiltro }}».
+        <button type="button" class="link-limpiar" @click="filtro = 'todo'">Ver todas</button>
+      </div>
     </div>
 
     <div v-else class="lista">
@@ -169,9 +181,40 @@ const busqueda = ref('');
 
 const abierta = estaAbierta;
 const etiqueta = computed(() => etiquetaFecha(fecha.value, hoyStr.value));
-const puedeReordenar = computed(() => !soloLectura.value && !busqueda.value && vueltas.value.length > 1);
 
-const filtradas = computed(() => vueltas.value.filter((v) => coincide(v, busqueda.value)));
+// Filtro por estado. El orden es el que el chofer usa en la calle: primero lo
+// que le falta. `campo` apunta al contador que ya calcula contarLocal().
+const FILTROS = [
+  { id: 'pendientes', campo: 'pendientes', texto: 'Pendientes', tono: 'pend' },
+  { id: 'entregadas', campo: 'entregadas', texto: 'Entregadas', tono: 'ok' },
+  { id: 'no_entregadas', campo: 'no_entregadas', texto: 'No entreg.', tono: 'mal' },
+  { id: 'todo', campo: 'total', texto: 'Todo', tono: '' },
+];
+const filtro = ref('todo');
+
+// Volver a tocar el filtro activo lo quita: así no hay que ir a buscar "Todo".
+function alternarFiltro(id) {
+  haptics.tap();
+  filtro.value = filtro.value === id && id !== 'todo' ? 'todo' : id;
+}
+
+const etiquetaFiltro = computed(() => FILTROS.find((f) => f.id === filtro.value)?.texto ?? '');
+
+function pasaFiltro(v) {
+  if (filtro.value === 'todo') return true;
+  if (filtro.value === 'pendientes') return estaAbierta(v);
+  if (filtro.value === 'entregadas') return v.estado === 'entregada';
+  if (filtro.value === 'no_entregadas') return v.estado === 'no_entregada';
+  return true;
+}
+
+// Reordenar sobre una lista recortada movería posiciones que no se ven, así
+// que sólo se permite con la lista completa.
+const puedeReordenar = computed(
+  () => !soloLectura.value && !busqueda.value && filtro.value === 'todo' && vueltas.value.length > 1
+);
+
+const filtradas = computed(() => vueltas.value.filter((v) => coincide(v, busqueda.value) && pasaFiltro(v)));
 
 // 5 días: 2 antes, el ancla al centro, 2 después.
 const diasVisibles = computed(() =>
@@ -428,6 +471,16 @@ onMounted(cargar);
 </script>
 
 <style scoped>
+/* Framework7 marca esta pantalla como `.page.no-navbar` (no lleva navbar) y
+   por esa regla le suma `--f7-page-navbar-offset` —el inset del notch— al
+   padding de `.page-content`. Como la barra de días ya reserva ese mismo
+   inset en su propio padding, el hueco se contaba DOS veces y quedaba una
+   franja muerta bajo la isla dinámica. Se anula aquí: la barra arranca
+   pegada al borde y su vidrio pasa por debajo del notch. */
+.pagina-vueltas {
+  --f7-page-navbar-offset: 0px;
+}
+
 /* ---------------- Barra de días: corona ---------------- */
 /* El arco no está "dibujado": cada .dia recibe su transform por JS
    (estiloDia), calculado sólo a partir de su distancia al centro. Aquí sólo
@@ -439,9 +492,9 @@ onMounted(cargar);
   display: flex;
   align-items: center;
   gap: 2px;
-  /* El giro de los días de los extremos saca sus esquinas ~14px por encima
-     del borde superior: ese margen va en el padding, no en la pantalla. */
-  padding: calc(16px + env(safe-area-inset-top)) 6px 10px;
+  /* Pegada al tope: sólo el inset del notch más lo justo para que el giro de
+     los días de los extremos (~10px de esquina) no se meta bajo la isla. */
+  padding: calc(10px + env(safe-area-inset-top)) 6px 10px;
   border-radius: 0 0 30px 30px;
   box-shadow: var(--glass-shadow);
   border-bottom: 1px solid var(--glass-border);
@@ -527,12 +580,23 @@ onMounted(cargar);
 
 /* ---------------- Contadores ---------------- */
 .contadores { display: flex; gap: 8px; padding: 0 16px 12px; }
+/* `width: auto` porque Framework7 declara `button { width: 100% }` global. */
 .cont {
-  flex: 1; border-radius: 14px; padding: 9px 4px; text-align: center;
+  flex: 1; width: auto; border-radius: 14px; padding: 9px 4px; text-align: center;
   background: var(--sup-campo);
   -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
   border: 1px solid var(--glass-border);
+  color: inherit; font-family: inherit; cursor: pointer;
+  transition: transform 0.12s ease, border-color 0.15s ease, background 0.15s ease;
 }
+.cont:active { transform: scale(0.95); }
+/* El filtro activo se marca con el borde y un realce del fondo, no con color
+   de texto: los números ya usan el color para decir de qué estado son. */
+.cont.act {
+  border-color: var(--inova-primary);
+  background: rgba(var(--f7-theme-color-rgb), 0.14);
+}
+.cont.act .cont-lbl { opacity: 0.9; font-weight: 700; }
 .cont-num { display: block; font-size: 20px; font-weight: 800; line-height: 1.1; }
 .cont-lbl { display: block; font-size: 10px; opacity: 0.55; margin-top: 1px; }
 .cont.pend .cont-num { color: var(--inova-primary); }
@@ -619,4 +683,8 @@ onMounted(cargar);
 .aviso-icono { font-size: 34px; opacity: 0.3; }
 .aviso-t { font-size: 16px; font-weight: 700; margin-top: 8px; }
 .aviso-s { font-size: 13px; opacity: 0.55; margin-top: 4px; line-height: 1.4; }
+.link-limpiar {
+  display: block; width: auto; margin: 8px auto 0; border: none; background: transparent;
+  color: var(--inova-primary); font-size: 13px; font-weight: 700; cursor: pointer;
+}
 </style>
