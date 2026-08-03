@@ -24,7 +24,7 @@ async function request(path, { method = 'GET', body, headers } = {}) {
 
   const res = await fetch(`${BASE}${path}`, opts);
   const text = await res.text();
-  let data = null;
+  let data;
   try { data = text ? JSON.parse(text) : null; } catch { data = text; }
 
   if (!res.ok) {

@@ -8,7 +8,7 @@
 import { db, sendJson, sendError, readBody } from '../_db.js';
 import { requiereSesion } from '../_auth.js';
 import {
-  hoyMx, esFechaValida, sumarDias, vueltasDelDia, contar, cargaPorDia,
+  hoyMx, esFechaValida, vueltasDelDia, contar, cargaPorDia,
   crearVuelta, reordenar, esOficina,
 } from '../_vueltas.js';
 import { buscarFactura, SAP_ES_STUB } from '../_sap.js';

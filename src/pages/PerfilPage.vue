@@ -254,11 +254,6 @@ async function togglePush(e) {
   }
 }
 
-const fecha = (iso) => new Date(iso.replace(' ', 'T') + 'Z').toLocaleDateString();
-
-
-
-
 function salir() {
   f7.dialog.confirm('¿Cerrar sesión en este dispositivo?', 'Cerrar sesión', async () => {
     try { await api.auth.salir(); } catch { /* aunque falle, limpiamos local */ }

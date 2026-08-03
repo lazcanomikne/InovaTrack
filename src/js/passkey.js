@@ -33,7 +33,7 @@ export async function registrarPasskey() {
   try {
     respuesta = await startRegistration({ optionsJSON: opciones });
   } catch (e) {
-    throw new Error(mensajeError(e));
+    throw new Error(mensajeError(e), { cause: e });
   }
   return api.auth.passkey.verificarRegistro(respuesta);
 }
@@ -45,7 +45,7 @@ export async function entrarConPasskey(email) {
   try {
     respuesta = await startAuthentication({ optionsJSON: opciones });
   } catch (e) {
-    throw new Error(mensajeError(e));
+    throw new Error(mensajeError(e), { cause: e });
   }
   const { usuario } = await api.auth.passkey.verificarLogin(email, respuesta);
   return usuario;
