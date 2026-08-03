@@ -1,20 +1,16 @@
-// Consulta de facturas en SAP a partir del folio del código de barras.
+// Consulta de facturas en SAP a partir del valor del código de barras.
 //
-// ─────────────────────────────────────────────────────────────────────────
-// FASE 1: STUB. Devuelve datos simulados.
+// Se conecta al puente externo de Inovatech (una API sobre SAP Business One),
+// leyendo la URL base y la llave de las variables de entorno SAP_API_URL y
+// SAP_API_KEY. Si no están configuradas, `buscarFactura` cae a datos de demo
+// (`buscarFacturaDemo`) para no romper el desarrollo local. La llave NUNCA se
+// guarda en el repo: sólo en el entorno (Vercel / .env).
 //
-// Por qué: el SAP Business One de Inovatech vive en una IP privada de la red
-// local (172.28.x.x:1433). Una función serverless de Vercel NO puede alcanzarla:
-// no es enrutable desde internet. Conectar de verdad exige una de estas dos:
-//
-//   a) Un puente en la red local que lea SAP y empuje las facturas del día a
-//      la base de la app (con X-Service-Token, igual que el portal de escritorio).
-//      Entonces `buscarFactura` consulta la tabla local en vez de SAP. ← recomendado
-//   b) Un túnel HTTPS (Cloudflare Tunnel) a un endpoint de solo lectura sobre
-//      SAP, y aquí se haría un fetch a ese endpoint.
-//
-// Cuando se decida, se reemplaza SOLO el cuerpo de `buscarFactura`. El resto
-// de la app no cambia: ya trabaja contra este contrato.
+// OJO — DocEntry vs folio: el puente identifica la factura por DocEntry (la
+// PK interna del documento en SAP, p. ej. 27322), que NO es el folio impreso
+// (DocNum, p. ej. 38223). El código de barras de la factura debe codificar el
+// DocEntry para que el escaneo resuelva; si codificara el folio, el puente
+// respondería 404.
 // ─────────────────────────────────────────────────────────────────────────
 
 /**
@@ -67,18 +63,77 @@ function semilla(texto) {
   return h;
 }
 
+// ── API real (Inovatech) ────────────────────────────────────────────────
+// El puente de SAP expone la factura por DocEntry (la PK interna del
+// documento, p. ej. 27322), NO por el folio impreso (DocNum, p. ej. 38223).
+// El valor que escanea/teclea el chofer se manda tal cual como DocEntry.
+// La URL base y la llave viven en variables de entorno: la llave nunca va en
+// el repo. Si faltan, se cae al stub para no romper el dev local.
+const SAP_API_URL = process.env.SAP_API_URL || '';   // .../api/externa
+const SAP_API_KEY = process.env.SAP_API_KEY || '';
+
+/** Bandera para que la UI avise cuando aún no hay SAP real conectado. */
+export const SAP_ES_STUB = !(SAP_API_URL && SAP_API_KEY);
+
+// Crystal Reports mete saltos "\r" y espacios dobles en el texto de dirección.
+const limpiar = (s) => (s ? String(s).replace(/\s*[\r\n]+\s*/g, ', ').replace(/\s{2,}/g, ' ').replace(/(,\s*)+/g, ', ').replace(/^,\s*|,\s*$/g, '').trim() : null);
+
+// Traduce la respuesta del puente al contrato que ya usa la app.
+function mapearFactura(d) {
+  const f = d.factura ?? {};
+  const c = d.cliente ?? {};
+  const ct = d.contacto ?? {};
+  const ent = d.direccionEntrega ?? {};
+  return {
+    // factura_numero muestra el folio humano; el DocEntry queda como referencia.
+    factura_numero: String(f.folio ?? f.docEntry ?? ''),
+    doc_entry: f.docEntry ?? null,
+    cliente_codigo: c.codigo ?? null,
+    cliente_nombre: c.nombre ?? null,
+    destinatario: null,
+    contacto: ct.nombre ?? null,
+    telefono: c.telefono || c.celular || ct.telefono || ct.celular || null,
+    // La entrega va a la dirección de ENTREGA, no a la fiscal.
+    direccion: limpiar(ent.texto) || limpiar([ent.calle, ent.colonia, ent.ciudad, ent.estado].filter(Boolean).join(', ')),
+    partidas: (d.articulos ?? []).map((a) => ({
+      articulo: a.codigo ?? null,
+      descripcion: a.descripcion ?? null,
+      cantidad: a.cantidad ?? null,
+      bultos: null, // el puente no reporta bultos
+    })),
+  };
+}
+
 export async function buscarFactura(folio) {
   const f = String(folio ?? '').trim();
   if (!f) return null;
+  if (SAP_ES_STUB) return buscarFacturaDemo(f);
 
-  // Convención del stub para poder probar el camino de error desde la app:
-  // cualquier folio que empiece con "0" se comporta como "no encontrada".
+  try {
+    const r = await fetch(`${SAP_API_URL.replace(/\/$/, '')}/factura/${encodeURIComponent(f)}`, {
+      headers: { 'X-API-Key': SAP_API_KEY },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (r.status === 404) return null;                 // no existe → captura manual
+    if (!r.ok) throw new Error(`SAP respondió ${r.status}`);
+    const d = await r.json();
+    // Una factura cancelada no se entrega: se trata como no encontrada.
+    if (d?.factura?.cancelada) return null;
+    return mapearFactura(d);
+  } catch {
+    // Sin alcance al puente (red/timeout): mejor ofrecer captura manual que
+    // reventar el escaneo. El chofer sigue trabajando.
+    return null;
+  }
+}
+
+// Stub sólo para dev local sin las variables de entorno. Cualquier folio que
+// empiece con "0" simula "no encontrada" para poder probar ese camino.
+function buscarFacturaDemo(f) {
   if (f.startsWith('0')) return null;
-
   const s = semilla(f);
   const cliente = CLIENTES_DEMO[s % CLIENTES_DEMO.length];
   const nPartidas = (s % 4) + 1;
-
   const partidas = Array.from({ length: nPartidas }, (_, i) => {
     const a = ARTICULOS_DEMO[(s + i * 7) % ARTICULOS_DEMO.length];
     return {
@@ -88,14 +143,5 @@ export async function buscarFactura(folio) {
       bultos: ((s + i * 5) % 3) + 1,
     };
   });
-
-  return {
-    factura_numero: `F-${f}`,
-    ...cliente,
-    partidas,
-    _stub: true, // la app lo muestra como "datos de prueba"
-  };
+  return { factura_numero: `F-${f}`, ...cliente, partidas, _stub: true };
 }
-
-/** Bandera para que la UI pueda avisar que aún no hay SAP real conectado. */
-export const SAP_ES_STUB = true;
