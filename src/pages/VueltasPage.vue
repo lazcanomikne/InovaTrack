@@ -1,5 +1,11 @@
 <template>
-  <f7-page name="vueltas" class="pagina-vueltas" @page:afterin="cargar">
+  <f7-page
+    name="vueltas"
+    class="pagina-vueltas"
+    ptr
+    @ptr:refresh="alJalarParaActualizar"
+    @page:afterin="cargar"
+  >
     <!-- ── Barra de días (Módulo 6) ───────────────────────────────────── -->
     <div class="barra-dias glass-strong">
       <button type="button" class="dia-nav" @click="moverDias(-1)" aria-label="Días anteriores">
@@ -99,16 +105,13 @@
       </div>
     </div>
 
-    <div v-else class="lista">
+    <div v-else class="lista" :class="{ reordenando: arrastreId !== null }">
       <div
         v-for="(v, i) in filtradas"
         :key="v.id"
         class="glass tarjeta"
         :class="{ cerrada: !abierta(v), arrastrando: arrastreId === v.id }"
-        :draggable="puedeReordenar"
-        @dragstart="iniciarArrastre(v, i)"
-        @dragover.prevent="sobreArrastre(i)"
-        @dragend="terminarArrastre"
+        :data-idx="i"
         @click="abrirDetalle(v)"
       >
         <!-- Barra lateral con el color del estado -->
@@ -116,7 +119,14 @@
 
         <div class="tarjeta-cuerpo">
           <div class="tarjeta-fila1">
-            <span v-if="puedeReordenar" class="agarre" @click.stop><i class="f7-icons">line_horizontal_3</i></span>
+            <!-- Agarre para reordenar: mantener presionado y arrastrar (pointer
+                 events; el drag HTML5 no funciona en iOS Safari). -->
+            <span
+              v-if="puedeReordenar"
+              class="agarre"
+              @click.stop
+              @pointerdown="iniciarArrastre(v, i, $event)"
+            ><i class="f7-icons">line_horizontal_3</i></span>
             <span class="orden">{{ i + 1 }}</span>
             <span class="cliente">{{ tituloVuelta(v) }}</span>
             <span v-if="esCritica(v)" class="chip critica">{{ v.intento }}º intento</span>
@@ -295,8 +305,11 @@ function mutarLocal(id, cambios) {
   contadores.value = contarLocal(vueltas.value);
 }
 
-async function cargar() {
-  cargando.value = true;
+// `silencioso` (jalar para actualizar): no se muestra el preloader de página
+// —eso escondería la lista y con ella el spinner del propio gesto—, sólo se
+// refrescan los datos por debajo.
+async function cargar(silencioso = false) {
+  if (!silencioso) cargando.value = true;
   try {
     const d = await api.vueltas.dia(fecha.value);
     soloLectura.value = d.solo_lectura;
@@ -308,15 +321,31 @@ async function cargar() {
     contadores.value = contarLocal(vueltas.value);
     await cargarBarra();
   } catch (e) {
-    f7.dialog.alert(e.message || 'No se pudieron cargar las vueltas.', 'Error');
+    if (!silencioso) f7.dialog.alert(e.message || 'No se pudieron cargar las vueltas.', 'Error');
   } finally {
     cargando.value = false;
   }
 }
 
-function alSincronizar() { cargar(); }
+// Jalar hacia abajo para actualizar (Framework7 PTR). Manda a la cola lo que
+// haya pendiente y recarga del servidor, sin tapar la lista.
+async function alJalarParaActualizar(done) {
+  haptics.tap();
+  try {
+    await cola.flush();
+    await cargar(true);
+  } finally {
+    done(); // cierra el spinner del gesto pase lo que pase
+  }
+}
+
+function alSincronizar() { cargar(true); }
 onMounted(() => window.addEventListener(cola.EVENTO_SINCRONIZADO, alSincronizar));
-onUnmounted(() => window.removeEventListener(cola.EVENTO_SINCRONIZADO, alSincronizar));
+onUnmounted(() => {
+  window.removeEventListener(cola.EVENTO_SINCRONIZADO, alSincronizar);
+  // Si se sale de la pantalla a mitad de un arrastre, no dejar listeners vivos.
+  window.removeEventListener('pointermove', moverArrastre);
+});
 
 // La pastilla de navegación (App.vue) dispara esto al tocar "Nueva": el ítem
 // central no es un tab, vive como acción sobre esta pantalla (Módulo 3).
@@ -344,26 +373,56 @@ function moverDias(n) {
 }
 
 /* --------------------------- Reordenar ----------------------------- */
+// Arrastre con el dedo (pointer events): el <div draggable> de HTML5 no
+// dispara en iOS Safari, así que la lista nunca se pudo reordenar en el
+// teléfono. Aquí el agarre captura el puntero y, según sobre qué tarjeta esté
+// el dedo, se reacomoda en vivo; al soltar se encola el nuevo orden.
 const arrastreId = ref(null);
 let desdeIdx = null;
+let punteroArrastre = null;
+let huboMovimiento = false;
 
-function iniciarArrastre(v, i) {
-  if (!puedeReordenar.value) return;
+function idxBajoElDedo(clientY) {
+  // La tarjeta que se está arrastrando tiene pointer-events desactivados
+  // (ver CSS), así que elementFromPoint devuelve la de abajo, no ella misma.
+  const el = document.elementFromPoint(window.innerWidth / 2, clientY)?.closest('.tarjeta[data-idx]');
+  return el ? Number(el.dataset.idx) : null;
+}
+
+function iniciarArrastre(v, i, e) {
+  if (!puedeReordenar.value || v.__temporal) return;
+  e.preventDefault();
   arrastreId.value = v.id;
   desdeIdx = i;
+  punteroArrastre = e.pointerId;
+  huboMovimiento = false;
+  haptics.tap();
+  window.addEventListener('pointermove', moverArrastre, { passive: false });
+  window.addEventListener('pointerup', soltarArrastre, { once: true });
+  window.addEventListener('pointercancel', soltarArrastre, { once: true });
 }
-function sobreArrastre(i) {
-  if (desdeIdx === null || i === desdeIdx) return;
+
+function moverArrastre(e) {
+  if (desdeIdx === null || e.pointerId !== punteroArrastre) return;
+  e.preventDefault(); // no dejar que la página haga scroll mientras se arrastra
+  const sobre = idxBajoElDedo(e.clientY);
+  if (sobre === null || sobre === desdeIdx) return;
+  huboMovimiento = true;
   const arr = [...vueltas.value];
   const [m] = arr.splice(desdeIdx, 1);
-  arr.splice(i, 0, m);
+  arr.splice(sobre, 0, m);
   vueltas.value = arr;
-  desdeIdx = i;
+  desdeIdx = sobre;
+  haptics.tap();
 }
-async function terminarArrastre() {
+
+async function soltarArrastre() {
+  window.removeEventListener('pointermove', moverArrastre);
   if (desdeIdx === null) return;
   arrastreId.value = null;
   desdeIdx = null;
+  punteroArrastre = null;
+  if (!huboMovimiento) return; // fue un toque sin arrastre: nada que guardar
   // Las vueltas creadas offline (temporales) todavía no tienen id real: se
   // excluyen del orden hasta que la cola las sincronice.
   const ids = vueltas.value.filter((v) => !v.__temporal).map((v) => v.id);
@@ -628,11 +687,24 @@ onMounted(cargar);
   transition: opacity 0.15s ease, transform 0.12s ease;
 }
 .tarjeta.cerrada { opacity: 0.62; }
-.tarjeta.arrastrando { transform: scale(0.97); opacity: 0.85; }
+/* La tarjeta que se arrastra se realza y deja de captar el puntero, para que
+   elementFromPoint devuelva la tarjeta de abajo y sepamos dónde soltar. */
+.tarjeta.arrastrando {
+  transform: scale(1.02);
+  opacity: 0.92;
+  box-shadow: 0 12px 30px rgba(17, 12, 46, 0.28);
+  pointer-events: none;
+  z-index: 5;
+}
+/* Mientras se reordena, ninguna tarjeta hace su transición de posición: se ven
+   saltar al hueco al instante, sin arrastre visual que confunda. */
+.lista.reordenando .tarjeta:not(.arrastrando) { transition: none; }
 .tarjeta-estado { position: absolute; left: 0; top: 0; bottom: 0; width: 6px; }
 
 .tarjeta-fila1 { display: flex; align-items: center; gap: 7px; margin-bottom: 5px; }
-.agarre { opacity: 0.3; cursor: grab; flex-shrink: 0; }
+/* touch-action:none: el agarre se queda el gesto para reordenar y no deja que
+   la página haga scroll mientras se arrastra. */
+.agarre { opacity: 0.3; cursor: grab; flex-shrink: 0; touch-action: none; padding: 2px; margin: -2px; }
 .agarre i { font-size: 16px; }
 .orden {
   flex-shrink: 0; min-width: 21px; height: 21px; border-radius: 7px;
