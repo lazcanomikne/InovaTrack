@@ -8,7 +8,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "db:migrate": "node --env-file-if-exists=.env scripts/migrate.mjs"
+    "db:migrate": "node --env-file-if-exists=.env scripts/migrate.mjs",
+    "db:migrate:reset": "node --env-file-if-exists=.env scripts/migrate.mjs --reset"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.111.0",

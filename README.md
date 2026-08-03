@@ -22,7 +22,7 @@ Los módulos de InovaOS (pendientes, checklist, evidencias, tablero, métricas, 
 ```bash
 npm install
 cp .env.example .env      # y rellena los valores (ver abajo)
-npm run db:migrate        # crea el esquema base  ⚠️ hace DROP TABLE
+npm run db:migrate:reset  # primera vez: crea el esquema base  ⚠️ hace DROP TABLE
 npm run dev               # Vite en http://localhost:5173
 ```
 
@@ -31,6 +31,24 @@ Para probar el API en local (funciones serverless) en otra terminal:
 ```bash
 npx vercel dev            # puerto 3000; Vite le hace proxy automáticamente
 ```
+
+### Migraciones
+
+`scripts/migrate.mjs` es un runner versionado: cada archivo de `migrations/*.sql`
+se aplica una sola vez y queda registrado por nombre en la tabla
+`schema_migrations`. Volver a correrlo es inofensivo — sólo aplica lo nuevo.
+
+```bash
+npm run db:migrate         # aplica las migraciones pendientes (no destructivas)
+npm run db:migrate:reset   # además permite las que hacen DROP TABLE
+```
+
+`0001_init.sql` y `0002_vueltas.sql` llevan el marcador `-- migrate:destructivo`
+porque reinicializan sus tablas con `DROP TABLE`: por eso sólo se aplican con
+`--reset`, para no poder borrar datos reales por accidente. Un archivo nuevo
+sólo necesita ese marcador si de verdad borra algo; si es aditivo (`CREATE
+TABLE`, `ALTER TABLE ADD COLUMN`), no lo lleva y `npm run db:migrate` lo aplica
+directo.
 
 ## Variables de entorno
 
@@ -66,7 +84,9 @@ Están documentadas en [`.env.example`](.env.example). Lo mínimo para levantar:
 
 ## Cómo agregar un módulo
 
-1. **Migración**: `migrations/0002_<modulo>.sql` con sus tablas → `node scripts/migrate.mjs 0002_<modulo>.sql`
+1. **Migración**: agrega `migrations/000N_<modulo>.sql` con sus tablas (aditiva,
+   sin `DROP`) → `npm run db:migrate` la aplica sola, por ser la primera sin
+   registrar en `schema_migrations`.
 2. **Backend**: `api/<modulo>/index.js` (lista + alta) y `api/<modulo>/[id].js` (detalle, editar, borrar).
    Protege cada endpoint con `requiereSesion(req, res)`.
 3. **Cliente**: agrega el bloque del módulo en `src/js/api.js`.

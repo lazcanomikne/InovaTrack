@@ -178,6 +178,29 @@ export async function detalleVuelta(id, usuario) {
   };
 }
 
+/* --------------------------- Transacciones ----------------------------- */
+/**
+ * Ejecuta `fn` dentro de una transacción de escritura y hace commit/rollback
+ * según el resultado. `crearVuelta` y `reprogramarVuelta` la usan para que
+ * sus varias escrituras (vuelta + partidas + historial, o cerrar + crear hija
+ * + copiar partidas + historial) se apliquen todas o ninguna: si algo falla a
+ * la mitad, no debe quedar una vuelta sin sus partidas ni una madre cerrada
+ * sin su hija.
+ */
+async function conTransaccion(fn) {
+  const tx = await db().transaction('write');
+  try {
+    const resultado = await fn(tx);
+    await tx.commit();
+    return resultado;
+  } catch (e) {
+    try { await tx.rollback(); } catch { /* ya se cerró sola tras el error */ }
+    throw e;
+  } finally {
+    tx.close();
+  }
+}
+
 /* ------------------------------ Creación ------------------------------ */
 /** Texto corto para identificar la vuelta en un aviso push. */
 const tituloParaAviso = (v) => v.cliente_nombre || v.destinatario || v.factura_numero || 'Nueva entrega';
@@ -185,9 +208,14 @@ const tituloParaAviso = (v) => v.cliente_nombre || v.destinatario || v.factura_n
 /**
  * Alta idempotente. Si el `client_uuid` ya existe (la cola reenvió), devuelve
  * la vuelta que ya se había creado en vez de duplicarla.
+ *
+ * `ejecutor` es el cliente o la transacción contra la que correr las
+ * escrituras. `reprogramarVuelta` pasa su propia transacción para que crear
+ * la hija sea parte de la misma operación atómica; el resto de las llamadas
+ * usan la transacción propia que abre `crearVuelta`.
  */
-export async function crearVuelta(datos, usuario) {
-  const c = db();
+async function crearVueltaEn(ejecutor, datos, usuario) {
+  const c = ejecutor;
 
   if (datos.client_uuid) {
     const { rows } = await c.execute({
@@ -264,6 +292,10 @@ export async function crearVuelta(datos, usuario) {
   return { vuelta, duplicada: false };
 }
 
+export async function crearVuelta(datos, usuario) {
+  return conTransaccion((tx) => crearVueltaEn(tx, datos, usuario));
+}
+
 /* ---------------------------- Transiciones ---------------------------- */
 /**
  * Cierra una vuelta como entregada o no entregada.
@@ -335,67 +367,92 @@ export async function reprogramarVuelta(vuelta, datos, usuario) {
     return { error: `Una vuelta "${vuelta.estado}" ya no se puede reprogramar.` };
   }
 
-  const c = db();
+  return conTransaccion(async (c) => {
+    // Idempotencia: si la cola reenvía, la hija ya existe y la devolvemos.
+    if (datos.client_uuid) {
+      const { rows } = await c.execute({
+        sql: 'SELECT * FROM vueltas WHERE client_uuid = ?',
+        args: [datos.client_uuid],
+      });
+      if (rows[0]) return { vuelta, hija: rows[0], duplicada: true };
+    }
 
-  // Idempotencia: si la cola reenvía, la hija ya existe y la devolvemos.
-  if (datos.client_uuid) {
-    const { rows } = await c.execute({
-      sql: 'SELECT * FROM vueltas WHERE client_uuid = ?',
-      args: [datos.client_uuid],
+    const sello = datos.ocurrido_en ?? new Date().toISOString();
+
+    const { rows: cerrada } = await c.execute({
+      sql: `UPDATE vueltas SET estado = 'reprogramada', cerrada_en = ?,
+              gps_lat = ?, gps_lng = ?, gps_precision = ?, updated_at = datetime('now')
+            WHERE id = ? RETURNING *`,
+      args: [sello, datos.gps?.lat ?? null, datos.gps?.lng ?? null,
+             datos.gps?.precision ?? null, vuelta.id],
     });
-    if (rows[0]) return { vuelta, hija: rows[0], duplicada: true };
-  }
 
-  const sello = datos.ocurrido_en ?? new Date().toISOString();
+    // La hija hereda todo y arrastra el conteo de intentos. Se crea dentro de
+    // esta misma transacción: si algo falla después, la madre no queda
+    // cerrada sin su hija.
+    const { vuelta: hija } = await crearVueltaEn(c, {
+      client_uuid: datos.client_uuid ?? null,
+      fecha: destino,
+      origen: vuelta.origen,
+      intento: Number(vuelta.intento || 1) + 1,
+      vuelta_padre_id: vuelta.id,
+      factura_folio: vuelta.factura_folio,
+      factura_numero: vuelta.factura_numero,
+      cliente_codigo: vuelta.cliente_codigo,
+      cliente_nombre: vuelta.cliente_nombre,
+      destinatario: vuelta.destinatario,
+      contacto: vuelta.contacto,
+      telefono: vuelta.telefono,
+      direccion: vuelta.direccion,
+      notas: vuelta.notas,
+      ocurrido_en: sello,
+      gps: datos.gps ?? null,
+    }, usuario);
 
-  const { rows: cerrada } = await c.execute({
-    sql: `UPDATE vueltas SET estado = 'reprogramada', cerrada_en = ?,
-            gps_lat = ?, gps_lng = ?, gps_precision = ?, updated_at = datetime('now')
-          WHERE id = ? RETURNING *`,
-    args: [sello, datos.gps?.lat ?? null, datos.gps?.lng ?? null,
-           datos.gps?.precision ?? null, vuelta.id],
+    // Las partidas de la factura viajan con la hija.
+    await c.execute({
+      sql: `INSERT INTO vuelta_partidas (vuelta_id, articulo, descripcion, cantidad, bultos, orden)
+            SELECT ?, articulo, descripcion, cantidad, bultos, orden
+            FROM vuelta_partidas WHERE vuelta_id = ?`,
+      args: [hija.id, vuelta.id],
+    });
+
+    await registrarHistorial(c, {
+      vuelta_id: vuelta.id,
+      evento: 'reprogramada',
+      detalle: `a ${destino}${datos.motivo_texto ? ' · ' + datos.motivo_texto : ''}`,
+      estado_anterior: vuelta.estado,
+      estado_nuevo: 'reprogramada',
+      actor_id: usuario.id,
+      ocurrido_en: sello,
+      gps: datos.gps ?? null,
+    });
+
+    return { vuelta: cerrada[0], hija };
   });
+}
 
-  // La hija hereda todo y arrastra el conteo de intentos.
-  const { vuelta: hija } = await crearVuelta({
-    client_uuid: datos.client_uuid ?? null,
-    fecha: destino,
-    origen: vuelta.origen,
-    intento: Number(vuelta.intento || 1) + 1,
-    vuelta_padre_id: vuelta.id,
-    factura_folio: vuelta.factura_folio,
-    factura_numero: vuelta.factura_numero,
-    cliente_codigo: vuelta.cliente_codigo,
-    cliente_nombre: vuelta.cliente_nombre,
-    destinatario: vuelta.destinatario,
-    contacto: vuelta.contacto,
-    telefono: vuelta.telefono,
-    direccion: vuelta.direccion,
-    notas: vuelta.notas,
-    ocurrido_en: sello,
-    gps: datos.gps ?? null,
-  }, usuario);
-
-  // Las partidas de la factura viajan con la hija.
-  await c.execute({
-    sql: `INSERT INTO vuelta_partidas (vuelta_id, articulo, descripcion, cantidad, bultos, orden)
-          SELECT ?, articulo, descripcion, cantidad, bultos, orden
-          FROM vuelta_partidas WHERE vuelta_id = ?`,
-    args: [hija.id, vuelta.id],
+/**
+ * Marca una vuelta en revisión por un conflicto de sincronización (Módulo 7):
+ * la cola offline mandó una acción que el servidor no pudo aplicar tal cual
+ * (p. ej. la vuelta se reasignó o se cerró mientras el chofer no tenía señal).
+ * Nunca pisa un cierre real: sólo aplica si la vuelta sigue abierta.
+ */
+export async function marcarConflicto({ vuelta_id, mensaje, actor_id }) {
+  return conTransaccion(async (c) => {
+    const { rows } = await c.execute({
+      sql: `UPDATE vueltas SET estado = 'revision', conflicto = ?, updated_at = datetime('now')
+            WHERE id = ? AND estado IN ('pendiente','revision')
+            RETURNING id`,
+      args: [mensaje, vuelta_id],
+    });
+    if (!rows[0]) return false; // no existía o ya estaba cerrada: no hay nada que marcar
+    await registrarHistorial(c, {
+      vuelta_id, evento: 'conflicto', detalle: mensaje,
+      estado_nuevo: 'revision', actor_id,
+    });
+    return true;
   });
-
-  await registrarHistorial(c, {
-    vuelta_id: vuelta.id,
-    evento: 'reprogramada',
-    detalle: `a ${destino}${datos.motivo_texto ? ' · ' + datos.motivo_texto : ''}`,
-    estado_anterior: vuelta.estado,
-    estado_nuevo: 'reprogramada',
-    actor_id: usuario.id,
-    ocurrido_en: sello,
-    gps: datos.gps ?? null,
-  });
-
-  return { vuelta: cerrada[0], hija };
 }
 
 /** Reordena la ruta del día. Llega el arreglo de ids en el orden deseado. */
