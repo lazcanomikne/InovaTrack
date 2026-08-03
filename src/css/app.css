@@ -267,12 +267,14 @@ html {
   width: -moz-fit-content;
   width: fit-content;
   max-width: calc(100vw - 12px);
-  bottom: calc(16px + env(safe-area-inset-bottom));
+  bottom: calc(14px + env(safe-area-inset-bottom));
   z-index: 13500;
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 10px 8px;
+  gap: 2px;
+  /* Baja como la pastilla original; ancha, no alta: el aire va a los lados
+     para que los rótulos respiren sin comerse pantalla. */
+  padding: 8px 10px;
   border-radius: 999px;
   box-shadow: 0 12px 38px rgba(17, 12, 46, 0.24), 0 3px 10px rgba(17, 12, 46, 0.12);
   isolation: isolate;
@@ -298,35 +300,35 @@ html {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  min-width: 54px;
-  padding: 8px 6px;
+  gap: 3px;
+  min-width: 64px;
+  padding: 7px 10px;
   border: none;
   background: transparent;
   border-radius: 16px;
   cursor: pointer;
   color: rgba(60, 60, 67, 0.55);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
   line-height: 1;
   white-space: nowrap;
   transition: color 0.15s ease, background 0.15s ease, transform 0.12s ease, opacity 0.15s ease;
 }
 .dark .fnav-item { color: rgba(235, 235, 245, 0.5); }
-.fnav-item i.f7-icons { font-size: 26px; }
+.fnav-item i.f7-icons { font-size: 24px; }
 .fnav-item:active { transform: scale(0.9); }
 .fnav-item.active { color: var(--inova-primary); }
 
 /* Ítem central "Crear": botón en gradiente */
 .fnav-item.create i.f7-icons {
   width: 46px;
-  height: 36px;
+  height: 32px;
   border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
   color: #fff;
-  font-size: 26px;
+  font-size: 24px;
   background: linear-gradient(135deg, var(--inova-primary), var(--inova-primary-2));
   box-shadow: 0 5px 14px rgba(91, 91, 214, 0.4);
 }
@@ -340,9 +342,10 @@ html {
   box-shadow: none;
 }
 
-/* El contenido nunca queda tapado por la pastilla flotante */
+/* El contenido nunca queda tapado por la pastilla flotante (~75px de alto
+   + 14px de separación al borde + un respiro). */
 .page-content {
-  padding-bottom: calc(115px + env(safe-area-inset-bottom));
+  padding-bottom: calc(102px + env(safe-area-inset-bottom));
 }
 
 .navbar .title {

@@ -203,8 +203,11 @@ function estiloDia(d, i) {
   const offset = Math.min(2.6, Math.max(-2.6, (i - 2) + offsetArrastre));
   const distancia = Math.abs(offset);
   const seleccionado = d.fecha === fecha.value;
-  const angulo = offset * 13;
-  const bajada = offset * offset * 3.4;
+  // Curva cóncava: el día central queda en el punto bajo del arco, que es
+  // donde cae el pulgar. Se hunde el centro en vez de levantar los extremos
+  // (mismo arco) para que la barra no se derrame por encima del borde.
+  const angulo = -offset * 13;
+  const bajada = Math.max(0, 4 - offset * offset) * 3.4;
   const escala = Math.max(0.78, 1 - distancia * 0.07) * (seleccionado ? 1.08 : 1);
   const opacidad = Math.max(0.45, 1 - distancia * 0.12);
   return {
@@ -436,7 +439,9 @@ onMounted(cargar);
   display: flex;
   align-items: center;
   gap: 2px;
-  padding: calc(10px + env(safe-area-inset-top)) 6px 14px;
+  /* El giro de los días de los extremos saca sus esquinas ~14px por encima
+     del borde superior: ese margen va en el padding, no en la pantalla. */
+  padding: calc(16px + env(safe-area-inset-top)) 6px 10px;
   border-radius: 0 0 30px 30px;
   box-shadow: var(--glass-shadow);
   border-bottom: 1px solid var(--glass-border);
@@ -458,7 +463,9 @@ onMounted(cargar);
   border: none; background: transparent; color: inherit;
   display: flex; flex-direction: column; align-items: center; gap: 1px;
   padding: 6px 2px 5px; border-radius: 14px; cursor: pointer;
-  transform-origin: bottom center;
+  /* El pivote va arriba para que, al girar, los extremos abran hacia arriba
+     y el arco quede cóncavo (ver estiloDia). */
+  transform-origin: top center;
 }
 @media (prefers-reduced-motion: no-preference) {
   .dia { transition: background 0.15s ease, transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.22s ease; }
@@ -507,7 +514,12 @@ onMounted(cargar);
   margin-top: 2px;
 }
 .pill-cola i { font-size: 12px; }
+/* `width: auto` es obligatorio: Framework7 declara `button { width: 100% }` a
+   nivel global, y combinado con flex-shrink:0 el botón medía todo el ancho de
+   la cabecera y se salía de la pantalla. Cualquier <button> propio que se
+   agregue aquí necesita lo mismo. */
 .btn-hoy {
+  width: auto;
   flex-shrink: 0; border: none; border-radius: 999px; cursor: pointer;
   padding: 8px 16px; font-size: 14px; font-weight: 700; color: #fff;
   background: linear-gradient(135deg, var(--inova-primary), var(--inova-primary-2));
@@ -543,7 +555,7 @@ onMounted(cargar);
 /* ---------------- Lista ---------------- */
 /* El padding inferior deja libre la última tarjeta por encima de la pastilla
    de navegación (crecida: ver .floating-nav en app.css). */
-.lista { display: flex; flex-direction: column; gap: 10px; padding: 0 16px 98px; }
+.lista { display: flex; flex-direction: column; gap: 10px; padding: 0 16px 12px; }
 
 .tarjeta {
   position: relative; overflow: hidden;

@@ -620,7 +620,11 @@ onMounted(cargar);
   min-width: 18px; height: 18px; padding: 0 5px; font-size: 11px;
   display: inline-flex; align-items: center; justify-content: center;
 }
+/* `width: auto` y `flex-shrink: 0`: Framework7 declara `button { width: 100% }`
+   a nivel global y aquí eso robaba 240px al título, que se partía en dos
+   líneas. Aplica a cualquier <button> propio dentro de un flex. */
 .link-editar {
+  width: auto; flex-shrink: 0;
   margin-left: auto; border: none; background: transparent; cursor: pointer;
   color: var(--inova-primary); font-size: 13px; font-weight: 700; text-transform: none;
 }
