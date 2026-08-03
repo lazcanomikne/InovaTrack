@@ -175,7 +175,9 @@ onUnmounted(() => clearInterval(cronometro));
   padding: 30px 24px 26px;
   text-align: center;
 }
-.login-logo { width: 68px; height: 68px; border-radius: 18px; margin-bottom: 14px; }
+/* 15px ≈ el 22% de 68: el mismo radio que el icono ya trae dibujado, para no
+   recortarle las esquinas al arte. */
+.login-logo { width: 68px; height: 68px; border-radius: 15px; margin-bottom: 14px; }
 .login-titulo { margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.02em; }
 .login-sub { margin: 4px 0 24px; font-size: 13px; opacity: 0.6; }
 
