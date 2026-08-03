@@ -2,6 +2,7 @@
 // las comparten el CRUD normal y la sincronización por lotes, y porque el
 // cliente puede mentir: lo que manda el teléfono se valida SIEMPRE aquí.
 import { db } from './_db.js';
+import { avisar } from './_push.js';
 
 /* ------------------------------- Fechas ------------------------------- */
 // El servidor corre en UTC, pero la operación es en México. "Hoy" para un
@@ -178,6 +179,9 @@ export async function detalleVuelta(id, usuario) {
 }
 
 /* ------------------------------ Creación ------------------------------ */
+/** Texto corto para identificar la vuelta en un aviso push. */
+const tituloParaAviso = (v) => v.cliente_nombre || v.destinatario || v.factura_numero || 'Nueva entrega';
+
 /**
  * Alta idempotente. Si el `client_uuid` ya existe (la cola reenvió), devuelve
  * la vuelta que ya se había creado en vez de duplicarla.
@@ -245,6 +249,17 @@ export async function crearVuelta(datos, usuario) {
     ocurrido_en: datos.ocurrido_en ?? null,
     gps: datos.gps ?? null,
   });
+
+  // La oficina puede dar de alta una vuelta para OTRO chofer (chofer_id
+  // explícito, distinto de quien la crea): a ese chofer hay que avisarle,
+  // porque su ruta cambió sin que él hiciera nada.
+  if (esOficina(usuario) && chofer !== Number(usuario.id)) {
+    await avisar(chofer, {
+      title: 'Nueva vuelta asignada',
+      body: tituloParaAviso(vuelta),
+      tag: `vuelta-${vuelta.id}`,
+    });
+  }
 
   return { vuelta, duplicada: false };
 }

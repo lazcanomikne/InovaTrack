@@ -1,13 +1,15 @@
 // Genera el token para que el navegador suba el archivo DIRECTO a Vercel Blob
 // (evita el límite de 4.5MB del cuerpo de las funciones). Aquí sólo autorizamos.
 //
-// Hoy exige únicamente que haya sesión válida. Cuando un módulo adjunte
-// archivos a un registro propio, añade aquí la comprobación de que ese usuario
-// puede escribir en ese registro (lee `clientPayload` y valida contra la BD),
-// para que nadie suba archivos colgando de algo que no le pertenece.
+// Además de exigir sesión válida, valida que la vuelta que viaja en
+// `clientPayload` sea del usuario (vueltaDe aplica el mismo filtro que el
+// resto del API: esOficina ve todas, un chofer sólo la suya). Sin esto,
+// cualquier usuario autenticado podía pedir un token y subir un archivo
+// colgado de una vuelta ajena.
 import { handleUpload } from '@vercel/blob/client';
 import { sendError } from './_db.js';
 import { sesionDe } from './_auth.js';
+import { vueltaDe } from './_vueltas.js';
 
 const TIPOS = [
   'image/jpeg', 'image/png', 'image/heic', 'image/heif', 'image/webp', 'image/gif',
@@ -26,6 +28,13 @@ export default async function handler(req, res) {
         if (!sesion) throw new Error('No autenticado');
 
         const extra = clientPayload ? JSON.parse(clientPayload) : {};
+
+        // Hoy el único uso real es adjuntar evidencia a una vuelta: exige que
+        // sea del usuario (o que sea oficina) antes de emitir el token.
+        const vueltaId = Number(extra.vuelta_id);
+        if (!Number.isFinite(vueltaId)) throw new Error('Falta vuelta_id.');
+        const vuelta = await vueltaDe(vueltaId, sesion);
+        if (!vuelta) throw new Error('Esa vuelta no es tuya.');
 
         return {
           allowedContentTypes: TIPOS,

@@ -22,7 +22,6 @@ import { db, sendJson, sendError, readBody } from '../_db.js';
 import {
   firmarSesion, sesionDe, requiereSesion, cookieSesion, cookieBorrar,
   generarCodigo, guardarCodigo, validarCodigo, usuarioPorEmail, limiteEnvios, limpiarCodigos,
-  firmarRegistro, emailDeRegistro, crearColaborador,
 } from '../_auth.js';
 import { enviarCodigo } from '../_mail.js';
 import { verificarPassword } from '../_password.js';

@@ -25,6 +25,7 @@ import {
   vueltaDe, crearVuelta, cerrarVuelta, reprogramarVuelta, reordenar,
   registrarHistorial, puedeEditar, ABIERTOS,
 } from './_vueltas.js';
+import { avisar } from './_push.js';
 
 const MAX_OPERACIONES = 200;
 
@@ -54,7 +55,12 @@ export default async function handler(req, res) {
       const r = await aplicar(client, op, sesion);
       resultados.push({ client_uuid: uuid, ok: true, ...r });
     } catch (e) {
-      // Un fallo no detiene el resto: se reporta y se sigue.
+      // Un fallo no detiene el resto: se reporta y se sigue. Un conflicto
+      // conviene avisarlo por push: el flush pudo correr en segundo plano,
+      // sin que el chofer tuviera la app abierta para ver el diálogo.
+      if (e.conflicto) {
+        await avisar(sesion.id, { title: 'Revisa una vuelta', body: e.message, tag: 'conflicto-sync' });
+      }
       resultados.push({
         client_uuid: uuid,
         ok: false,

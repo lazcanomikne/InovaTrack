@@ -16,7 +16,7 @@ CREATE TABLE usuarios (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   nombre TEXT NOT NULL,
   email TEXT UNIQUE,
-  rol TEXT DEFAULT 'colaborador',      -- direccion | jefe | colaborador
+  rol TEXT DEFAULT 'chofer',           -- chofer | oficina | direccion (ver 0003_roles.sql)
   avatar TEXT,                         -- data URL (jpeg reescalado en el cliente)
   created_at TEXT DEFAULT (datetime('now'))
 );
