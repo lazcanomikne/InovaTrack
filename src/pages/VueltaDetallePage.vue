@@ -228,21 +228,23 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick } from 'vue';
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
 import { f7 } from 'framework7-vue';
 import { api } from '@/js/api.js';
+import { store, setMotivos } from '@/js/store.js';
+import * as cola from '@/js/cola.js';
 import {
   estadoInfo, estaAbierta, esCritica, tituloVuelta, etiquetaFecha, horaCorta,
   enlaceLlamada, enlaceWhatsApp, enlaceMapa, sumarDias, hoy,
 } from '@/js/vueltas.js';
-import { comprimirFoto, firmaABlob, subirEvidencia, nombreFoto, nombreFirma, pesoLegible } from '@/js/evidencias.js';
+import { comprimirFoto, firmaABlob, nombreFoto, nombreFirma, pesoLegible } from '@/js/evidencias.js';
 
 const props = defineProps({ f7route: Object, f7router: Object });
 const id = Number(props.f7route?.params?.id);
 
-const v = ref(null);
+const base = ref(null); // lo último que llegó del servidor, sin overlay
+const v = ref(null);    // base + lo que la cola offline aún no sincronizó (lo que se pinta)
 const cargando = ref(true);
-const motivos = ref([]);
 const viendo = ref(null);
 
 const info = computed(() => estadoInfo(v.value?.estado));
@@ -259,14 +261,22 @@ const EVENTOS = {
   no_entregada: 'No entregada', reprogramada: 'Reprogramada', conflicto: 'Conflicto',
 };
 const textoEvento = (e) => EVENTOS[e] ?? e;
-const textoMotivo = (c) => motivos.value.find((m) => m.clave === c)?.texto ?? c;
+const textoMotivo = (c) => store.motivos.find((m) => m.clave === c)?.texto ?? c;
+
+// Recalcula `v` a partir de `base` + la cola: se llama tras cada acción para
+// que la pantalla refleje al instante lo que se acaba de encolar.
+async function refrescarVista() {
+  if (!base.value) return;
+  v.value = await cola.aplicarPendientesDetalle(base.value);
+}
 
 async function cargar() {
   cargando.value = true;
   try {
-    v.value = await api.vueltas.detalle(id);
-    if (!motivos.value.length) {
-      try { motivos.value = (await api.catalogos.todo()).motivos; } catch { /* opcional */ }
+    base.value = await api.vueltas.detalle(id);
+    await refrescarVista();
+    if (!store.motivos.length) {
+      try { setMotivos((await api.catalogos.todo()).motivos); } catch { /* opcional */ }
     }
   } catch (e) {
     f7.dialog.alert(e.message || 'No se pudo cargar.', 'Error');
@@ -274,6 +284,10 @@ async function cargar() {
     cargando.value = false;
   }
 }
+
+function alSincronizar() { cargar(); }
+onMounted(() => window.addEventListener(cola.EVENTO_SINCRONIZADO, alSincronizar));
+onUnmounted(() => window.removeEventListener(cola.EVENTO_SINCRONIZADO, alSincronizar));
 
 /* GPS de mejor esfuerzo: nunca bloquea el cierre. */
 function ubicacion() {
@@ -372,6 +386,10 @@ function limpiarFirma() {
 }
 
 /* --------------------------- Confirmar ------------------------------ */
+// Offline-first: encola el cierre y las evidencias (con o sin señal) y
+// refleja el resultado esperado de una vez; la cola las manda al servidor en
+// cuanto puede (Módulo 7). El cierre va primero, las evidencias después —
+// igual que antes: si una foto falla al subir, la entrega ya quedó firme.
 async function confirmarEntrega() {
   guardando.value = true;
   // El sello se toma AQUÍ, cuando el chofer confirma, no cuando termine de
@@ -379,36 +397,28 @@ async function confirmarEntrega() {
   const ocurrido_en = new Date().toISOString();
   try {
     const gps = await ubicacion();
-    await api.vueltas.entregar(id, {
-      recibio_nombre: recibio.value.trim() || null,
-      ocurrido_en,
-      gps,
+    await cola.encolar({
+      tipo: 'entregar', vuelta_id: id,
+      payload: { recibio_nombre: recibio.value.trim() || null, ocurrido_en, gps },
     });
 
-    // Las evidencias van después: si alguna falla, la entrega ya quedó firme.
-    const fallos = [];
     for (const f of fotos.value) {
-      try { await subirEvidencia(id, f.blob, { tipo: 'foto', nombre: nombreFoto(id), ocurrido_en }); }
-      catch (e) { fallos.push('foto: ' + e.message); }
+      await cola.encolar({
+        tipo: 'evidencia', vuelta_id: id,
+        payload: { tipo_evidencia: 'foto', blob: f.blob, nombre: nombreFoto(id), ocurrido_en },
+      });
     }
     if (hayFirma.value) {
-      try {
-        const blob = await firmaABlob(firmaCanvas.value);
-        await subirEvidencia(id, blob, { tipo: 'firma', nombre: nombreFirma(id), ocurrido_en });
-      } catch (e) { fallos.push('firma: ' + e.message); }
+      const blob = await firmaABlob(firmaCanvas.value);
+      await cola.encolar({
+        tipo: 'evidencia', vuelta_id: id,
+        payload: { tipo_evidencia: 'firma', blob, nombre: nombreFirma(id), ocurrido_en },
+      });
     }
 
     cerrarEntrega();
-    await cargar();
-
-    if (fallos.length) {
-      f7.dialog.alert(
-        `La entrega quedó registrada, pero no se pudo subir:\n\n${fallos.join('\n')}`,
-        'Evidencias pendientes'
-      );
-    } else {
-      f7.toast.create({ text: 'Entregada ✓', closeTimeout: 1500, position: 'center' }).open();
-    }
+    await refrescarVista();
+    f7.toast.create({ text: 'Entregada ✓', closeTimeout: 1500, position: 'center' }).open();
   } catch (e) {
     f7.dialog.alert(e.message, 'No se pudo marcar');
   } finally {
@@ -418,13 +428,13 @@ async function confirmarEntrega() {
 
 /* ------------------------- Otras acciones --------------------------- */
 async function noEntregar() {
-  if (!motivos.value.length) {
-    try { motivos.value = (await api.catalogos.todo()).motivos; } catch { /* sigue */ }
+  if (!store.motivos.length) {
+    try { setMotivos((await api.catalogos.todo()).motivos); } catch { /* sigue */ }
   }
   f7.dialog.create({
     title: '¿Por qué no se entregó?',
     buttons: [
-      ...motivos.value.map((m) => ({ text: m.texto, onClick: () => registrarNoEntrega(m) })),
+      ...store.motivos.map((m) => ({ text: m.texto, onClick: () => registrarNoEntrega(m) })),
       { text: 'Cancelar', color: 'gray' },
     ],
     verticalButtons: true,
@@ -433,18 +443,13 @@ async function noEntregar() {
 
 async function registrarNoEntrega(motivo) {
   const guardar = async (texto) => {
-    try {
-      await api.vueltas.noEntregar(id, {
-        motivo_clave: motivo.clave,
-        motivo_texto: texto ?? null,
-        ocurrido_en: new Date().toISOString(),
-        gps: await ubicacion(),
-      });
-      await cargar();
-      f7.dialog.confirm('¿Reprogramar para mañana?', 'No entregada', () => moverA(sumarDias(v.value.fecha, 1)));
-    } catch (e) {
-      f7.dialog.alert(e.message, 'Error');
-    }
+    const payload = {
+      motivo_clave: motivo.clave, motivo_texto: texto ?? null,
+      ocurrido_en: new Date().toISOString(), gps: await ubicacion(),
+    };
+    await cola.encolar({ tipo: 'no_entregar', vuelta_id: id, payload });
+    await refrescarVista();
+    f7.dialog.confirm('¿Reprogramar para mañana?', 'No entregada', () => moverA(sumarDias(v.value.fecha, 1)));
   };
   if (motivo.pide_texto) f7.dialog.prompt('Describe el motivo', motivo.texto, (t) => guardar(t?.trim() || null));
   else guardar(null);
@@ -472,18 +477,10 @@ function elegirFecha() {
 }
 
 async function moverA(fecha_destino) {
-  try {
-    await api.vueltas.reprogramar(id, {
-      fecha_destino,
-      ocurrido_en: new Date().toISOString(),
-      gps: await ubicacion(),
-      client_uuid: crypto.randomUUID(),
-    });
-    f7.toast.create({ text: `Movida a ${etiquetaFecha(fecha_destino)} ✓`, closeTimeout: 1600, position: 'center' }).open();
-    await cargar();
-  } catch (e) {
-    f7.dialog.alert(e.message, 'No se pudo reprogramar');
-  }
+  const payload = { fecha_destino, ocurrido_en: new Date().toISOString(), gps: await ubicacion() };
+  await cola.encolar({ tipo: 'reprogramar', vuelta_id: id, payload });
+  await refrescarVista();
+  f7.toast.create({ text: `Movida a ${etiquetaFecha(fecha_destino)} ✓`, closeTimeout: 1600, position: 'center' }).open();
 }
 
 function editar() {
@@ -491,14 +488,13 @@ function editar() {
   f7.dialog.prompt('Dirección', 'Editar', (dir) => {
     f7.dialog.prompt('Teléfono', 'Editar', async (telf) => {
       f7.dialog.prompt('Notas', 'Editar', async (notas) => {
-        try {
-          await api.vueltas.editar(id, {
-            direccion: dir ?? d.direccion,
-            telefono: telf ?? d.telefono,
-            notas: notas ?? d.notas,
-          });
-          await cargar();
-        } catch (e) { f7.dialog.alert(e.message, 'Error'); }
+        const payload = {
+          direccion: dir ?? d.direccion,
+          telefono: telf ?? d.telefono,
+          notas: notas ?? d.notas,
+        };
+        await cola.encolar({ tipo: 'editar', vuelta_id: id, payload });
+        await refrescarVista();
       }, null, d.notas ?? '');
     }, null, d.telefono ?? '');
   }, null, d.direccion ?? '');

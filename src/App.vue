@@ -42,7 +42,8 @@ import { reactive, ref, computed, onMounted } from 'vue';
 import { f7, f7ready } from 'framework7-vue';
 import routes from '@/js/routes.js';
 import { api } from '@/js/api.js';
-import { store, setSesion } from '@/js/store.js';
+import { store, setSesion, setMotivos, sesionCacheada, cachearSesion } from '@/js/store.js';
+import { flush as flushCola } from '@/js/cola.js';
 import { sincronizar as sincronizarPush } from '@/js/push.js';
 import LoginPage from '@/pages/LoginPage.vue';
 
@@ -101,11 +102,23 @@ onMounted(async () => {
   try {
     const { usuario } = await api.auth.yo();
     setSesion(usuario);
+    cachearSesion(usuario);
     // Si este dispositivo ya tiene notificaciones activas, lo (re)registra para
     // el usuario actual — así al cambiar de teléfono sigue recibiendo push.
     sincronizarPush();
-  } catch {
-    setSesion(null); // 401: se muestra el login
+    // Lo que quedó pendiente de una sesión anterior sin señal se manda ahora.
+    flushCola();
+    // Los motivos de no entrega se guardan en memoria desde el arranque: si no,
+    // un chofer sin señal no podría abrir ese diálogo la primera vez del día.
+    try { setMotivos((await api.catalogos.todo()).motivos); } catch { /* se reintenta cuando haya señal */ }
+  } catch (e) {
+    // /api/auth queda fuera de la caché del service worker a propósito (una
+    // sesión guardada podría mentir sobre si sigue activa). Pero un chofer
+    // realmente sin señal no debe quedar fuera de la app: sólo un 401 real
+    // del servidor cierra la sesión; un error de red usa la última conocida.
+    const cache = e?.status === 401 ? null : sesionCacheada();
+    setSesion(cache);
+    if (!cache) cachearSesion(null);
   } finally {
     store.comprobandoSesion = false;
   }

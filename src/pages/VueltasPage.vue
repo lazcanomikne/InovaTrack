@@ -39,6 +39,11 @@
           <span v-else>{{ contadores.total }} vuelta{{ contadores.total === 1 ? '' : 's' }}</span>
         </div>
       </div>
+      <!-- Cola offline (Módulo 7): visible sólo cuando hay algo sin sincronizar. -->
+      <span v-if="store.sinConexion || store.pendientesSync > 0" class="pill-cola">
+        <i class="f7-icons">{{ store.sinConexion ? 'wifi_slash' : 'arrow_2_circlepath' }}</i>
+        {{ store.sinConexion ? 'Sin conexión' : `Sincronizando (${store.pendientesSync})` }}
+      </span>
       <button v-if="fecha !== hoyStr" type="button" class="btn-hoy" @click="irA(hoyStr)">Hoy</button>
     </div>
 
@@ -114,7 +119,7 @@
           </div>
 
           <!-- Acciones rápidas de un toque (Módulo 4) -->
-          <div v-if="abierta(v) && !soloLectura" class="acciones" @click.stop>
+          <div v-if="abierta(v) && !soloLectura && !v.__temporal" class="acciones" @click.stop>
             <button type="button" class="acc ok" @click="entregar(v)">
               <i class="f7-icons">checkmark_alt</i> Entregada
             </button>
@@ -137,13 +142,14 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { f7 } from 'framework7-vue';
 import { api } from '@/js/api.js';
-import { store } from '@/js/store.js';
+import { store, setMotivos } from '@/js/store.js';
+import * as cola from '@/js/cola.js';
 import {
   hoy, sumarDias, partesFecha, etiquetaFecha, horaCorta,
-  estadoInfo, estaAbierta, esCritica, tituloVuelta, direccionCorta, coincide,
+  estadoInfo, estaAbierta, esCritica, tituloVuelta, direccionCorta, coincide, contarLocal,
 } from '@/js/vueltas.js';
 
 const props = defineProps({ f7router: Object });
@@ -157,7 +163,6 @@ const carga = ref({});           // { 'YYYY-MM-DD': nAbiertas }
 const cargando = ref(true);
 const soloLectura = ref(false);
 const busqueda = ref('');
-const motivos = ref([]);
 
 const abierta = estaAbierta;
 const etiqueta = computed(() => etiquetaFecha(fecha.value, hoyStr.value));
@@ -174,14 +179,24 @@ const diasVisibles = computed(() =>
 );
 
 /* ------------------------------ Datos ------------------------------ */
+// Recalcula contadores y guarda la vuelta ya mutada, sin esperar al servidor.
+function mutarLocal(id, cambios) {
+  const i = vueltas.value.findIndex((v) => v.id === id);
+  if (i === -1) return;
+  vueltas.value[i] = { ...vueltas.value[i], ...cambios };
+  contadores.value = contarLocal(vueltas.value);
+}
+
 async function cargar() {
   cargando.value = true;
   try {
     const d = await api.vueltas.dia(fecha.value);
-    vueltas.value = d.vueltas;
-    contadores.value = d.contadores;
     soloLectura.value = d.solo_lectura;
     hoyStr.value = d.hoy;
+    // Sobre lo que trae el servidor, reaplica lo que la cola offline aún no
+    // sincronizó: así una recarga en modo avión no deshace lo ya marcado.
+    vueltas.value = await cola.aplicarPendientes(d.vueltas, fecha.value);
+    contadores.value = contarLocal(vueltas.value);
     await cargarBarra();
   } catch (e) {
     f7.dialog.alert(e.message || 'No se pudieron cargar las vueltas.', 'Error');
@@ -189,6 +204,10 @@ async function cargar() {
     cargando.value = false;
   }
 }
+
+function alSincronizar() { cargar(); }
+onMounted(() => window.addEventListener(cola.EVENTO_SINCRONIZADO, alSincronizar));
+onUnmounted(() => window.removeEventListener(cola.EVENTO_SINCRONIZADO, alSincronizar));
 
 async function cargarBarra() {
   try {
@@ -230,12 +249,10 @@ async function terminarArrastre() {
   if (desdeIdx === null) return;
   arrastreId.value = null;
   desdeIdx = null;
-  try {
-    await api.vueltas.reordenar(fecha.value, vueltas.value.map((v) => v.id));
-  } catch (e) {
-    f7.toast.create({ text: 'No se guardó el orden: ' + e.message, closeTimeout: 2500 }).open();
-    cargar();
-  }
+  // Las vueltas creadas offline (temporales) todavía no tienen id real: se
+  // excluyen del orden hasta que la cola las sincronice.
+  const ids = vueltas.value.filter((v) => !v.__temporal).map((v) => v.id);
+  await cola.encolar({ tipo: 'reordenar', payload: { ids, fecha: fecha.value } });
 }
 
 /* ---------------------------- Acciones ----------------------------- */
@@ -253,29 +270,28 @@ function ubicacion() {
   });
 }
 
+// Todas las acciones siguen el mismo patrón offline-first: aplican el cambio
+// de una vez en la UI y encolan la operación; la cola la manda al servidor en
+// cuanto hay señal (Módulo 7). Nunca hay un `await` de red aquí.
 async function entregar(v) {
   f7.dialog.prompt('¿Quién recibió? (opcional)', 'Marcar entregada', async (nombre) => {
     const gps = await ubicacion();
-    try {
-      await api.vueltas.entregar(v.id, {
-        recibio_nombre: nombre?.trim() || null,
-        ocurrido_en: new Date().toISOString(),   // sello del dispositivo
-        gps,
-      });
-      f7.toast.create({ text: 'Entregada ✓', closeTimeout: 1400, position: 'center' }).open();
-      cargar();
-    } catch (e) {
-      f7.dialog.alert(e.message, 'No se pudo marcar');
-    }
+    const payload = { recibio_nombre: nombre?.trim() || null, ocurrido_en: new Date().toISOString(), gps };
+    mutarLocal(v.id, {
+      estado: 'entregada', recibio_nombre: payload.recibio_nombre,
+      cerrada_en: payload.ocurrido_en, gps_lat: gps?.lat ?? null, gps_lng: gps?.lng ?? null,
+    });
+    await cola.encolar({ tipo: 'entregar', vuelta_id: v.id, payload });
+    f7.toast.create({ text: 'Entregada ✓', closeTimeout: 1400, position: 'center' }).open();
   });
 }
 
 async function noEntregar(v) {
-  if (!motivos.value.length) {
-    try { motivos.value = (await api.catalogos.todo()).motivos; } catch { /* sigue */ }
+  if (!store.motivos.length) {
+    try { setMotivos((await api.catalogos.todo()).motivos); } catch { /* sigue: se cargan al abrir la app */ }
   }
   const botones = [
-    ...motivos.value.map((m) => ({ text: m.texto, onClick: () => registrarNoEntrega(v, m) })),
+    ...store.motivos.map((m) => ({ text: m.texto, onClick: () => registrarNoEntrega(v, m) })),
     { text: 'Cancelar', color: 'gray' },
   ];
   f7.dialog.create({ title: '¿Por qué no se entregó?', buttons: botones, verticalButtons: true }).open();
@@ -284,19 +300,17 @@ async function noEntregar(v) {
 async function registrarNoEntrega(v, motivo) {
   const guardar = async (texto) => {
     const gps = await ubicacion();
-    try {
-      await api.vueltas.noEntregar(v.id, {
-        motivo_clave: motivo.clave,
-        motivo_texto: texto ?? null,
-        ocurrido_en: new Date().toISOString(),
-        gps,
-      });
-      cargar();
-      // Tras el motivo, ofrecemos reprogramar en el mismo flujo (Módulo 5).
-      f7.dialog.confirm('¿Reprogramar esta vuelta para mañana?', 'No entregada', () => pasarAManana(v, true));
-    } catch (e) {
-      f7.dialog.alert(e.message, 'No se pudo registrar');
-    }
+    const payload = {
+      motivo_clave: motivo.clave, motivo_texto: texto ?? null,
+      ocurrido_en: new Date().toISOString(), gps,
+    };
+    mutarLocal(v.id, {
+      estado: 'no_entregada', motivo_clave: payload.motivo_clave, motivo_texto: payload.motivo_texto,
+      cerrada_en: payload.ocurrido_en, gps_lat: gps?.lat ?? null, gps_lng: gps?.lng ?? null,
+    });
+    await cola.encolar({ tipo: 'no_entregar', vuelta_id: v.id, payload });
+    // Tras el motivo, ofrecemos reprogramar en el mismo flujo (Módulo 5).
+    f7.dialog.confirm('¿Reprogramar esta vuelta para mañana?', 'No entregada', () => pasarAManana(v, true));
   };
   if (motivo.pide_texto) f7.dialog.prompt('Describe el motivo', motivo.texto, (t) => guardar(t?.trim() || null));
   else guardar(null);
@@ -306,18 +320,10 @@ async function pasarAManana(v, yaCerrada = false) {
   const destino = sumarDias(fecha.value, 1);
   const hacerlo = async () => {
     const gps = await ubicacion();
-    try {
-      await api.vueltas.reprogramar(v.id, {
-        fecha_destino: destino,
-        ocurrido_en: new Date().toISOString(),
-        gps,
-        client_uuid: crypto.randomUUID(),
-      });
-      f7.toast.create({ text: `Movida a ${etiquetaFecha(destino, hoyStr.value).toLowerCase()} ✓`, closeTimeout: 1600, position: 'center' }).open();
-      cargar();
-    } catch (e) {
-      f7.dialog.alert(e.message, 'No se pudo reprogramar');
-    }
+    const payload = { fecha_destino: destino, ocurrido_en: new Date().toISOString(), gps };
+    mutarLocal(v.id, { estado: 'reprogramada', cerrada_en: payload.ocurrido_en });
+    await cola.encolar({ tipo: 'reprogramar', vuelta_id: v.id, payload });
+    f7.toast.create({ text: `Movida a ${etiquetaFecha(destino, hoyStr.value).toLowerCase()} ✓`, closeTimeout: 1600, position: 'center' }).open();
   };
   if (yaCerrada) return hacerlo();
   f7.dialog.confirm(`¿Pasar «${tituloVuelta(v)}» a mañana?`, 'Reprogramar', hacerlo);
@@ -326,22 +332,20 @@ async function pasarAManana(v, yaCerrada = false) {
 function nuevaManual() {
   f7.dialog.prompt('Cliente o descripción', 'Vuelta manual', async (nombre) => {
     if (!nombre?.trim()) return;
-    try {
-      await api.vueltas.crear({
-        origen: 'manual',
-        cliente_nombre: nombre.trim(),
-        fecha: fecha.value,
-        client_uuid: crypto.randomUUID(),
-      });
-      f7.toast.create({ text: 'Vuelta agregada ✓', closeTimeout: 1400, position: 'center' }).open();
-      cargar();
-    } catch (e) {
-      f7.dialog.alert(e.message, 'No se pudo crear');
-    }
+    const payload = { origen: 'manual', cliente_nombre: nombre.trim(), fecha: fecha.value, ocurrido_en: new Date().toISOString() };
+    const client_uuid = crypto.randomUUID();
+    vueltas.value = [...vueltas.value, cola.vueltaTemporal(client_uuid, payload)];
+    contadores.value = contarLocal(vueltas.value);
+    await cola.encolar({ tipo: 'crear', payload, client_uuid });
+    f7.toast.create({ text: 'Vuelta agregada ✓', closeTimeout: 1400, position: 'center' }).open();
   });
 }
 
 function abrirDetalle(v) {
+  if (v.__temporal) {
+    f7.toast.create({ text: 'Se está sincronizando, un momento…', closeTimeout: 1400, position: 'center' }).open();
+    return;
+  }
   // La página inicial de un tab no siempre recibe el prop f7router; en ese
   // caso tomamos el router de la vista visible.
   const router = props.f7router ?? f7.views?.current?.router ?? f7.view?.current?.router;
@@ -413,6 +417,13 @@ onMounted(cargar);
   font-weight: 600; opacity: 1;
 }
 .pill-lectura i { font-size: 11px; }
+.pill-cola {
+  display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0;
+  background: rgba(255,159,10,0.18); color: #b26a00;
+  padding: 5px 11px; border-radius: 999px; font-size: 12px; font-weight: 700;
+  margin-top: 2px;
+}
+.pill-cola i { font-size: 12px; }
 .btn-hoy {
   flex-shrink: 0; border: none; border-radius: 999px; cursor: pointer;
   padding: 8px 16px; font-size: 14px; font-weight: 700; color: #fff;
