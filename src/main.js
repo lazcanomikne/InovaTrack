@@ -14,9 +14,15 @@ import './css/app.css';
 
 import App from './App.vue';
 import { iniciarTema } from './js/tema.js';
+import { iniciarActualizaciones } from './js/actualizacion.js';
 
 // Aplica el tema de color guardado antes de montar (evita parpadeo).
 iniciarTema();
+
+// Registra el service worker "a mano" (ver vite.config.js: injectRegister
+// false + registerType 'prompt') para controlar cuándo se activa una
+// versión nueva en vez de que lo haga sola.
+iniciarActualizaciones();
 
 // Inicializa el plugin de Framework7 para Vue
 Framework7.use(Framework7Vue);

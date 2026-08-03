@@ -17,14 +17,22 @@ export default defineConfig({
   plugins: [
     vue(),
     VitePWA({
-      // autoUpdate: el nuevo service worker toma control y refresca la app
-      // sin que el usuario tenga que reinstalar la PWA desde cero.
-      registerType: 'autoUpdate',
-      injectRegister: 'auto',
+      // 'prompt' (no 'autoUpdate'): el service worker nuevo se queda
+      // esperando (SW.waiting) hasta que la app decide activarlo a propósito
+      // (src/js/actualizacion.js, botón "Actualizar app" en Perfil). Con
+      // 'autoUpdate' el SW se activaba solo y no había forma de avisarle al
+      // chofer ni de distinguir "ya estás al día" de "se acaba de actualizar".
+      // injectRegister:false porque el registro lo hacemos a mano con
+      // virtual:pwa-register (registerSW) para poder pedirle updateServiceWorker()
+      // bajo demanda en vez del script automático.
+      registerType: 'prompt',
+      injectRegister: false,
       workbox: {
         cleanupOutdatedCaches: true,
+        // clientsClaim sin skipWaiting: al activar el SW nuevo (a propósito)
+        // toma control de las pestañas abiertas de inmediato, pero nunca lo
+        // hace por su cuenta mientras está sólo "esperando".
         clientsClaim: true,
-        skipWaiting: true,
         // Inyecta los handlers de push (notificaciones nativas) en el SW.
         importScripts: ['/push-sw.js'],
         navigateFallback: '/index.html',
@@ -63,6 +71,11 @@ export default defineConfig({
           { src: '/icons/icon-512-maskable.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
       },
+      // OJO al probar el flujo de actualización (src/js/actualizacion.js):
+      // en `npm run dev`, virtual:pwa-register es un stub que no registra
+      // nada ni dispara eventos (ver node_modules/vite-plugin-pwa/dist/client/dev/register.js).
+      // Para probar "Actualizar app" de verdad hace falta `npm run build`
+      // + `npm run preview` (dos veces, para simular una versión nueva).
       devOptions: {
         enabled: true,
         type: 'module',

@@ -128,7 +128,10 @@
         <li class="item-content">
           <div class="item-inner">
             <div class="item-title">Build</div>
-            <div class="item-after">{{ buildId }}</div>
+            <div class="item-after">
+              {{ buildId }}
+              <span v-if="estadoActualizacion.disponible" class="badge-nuevo">Nueva versión lista</span>
+            </div>
           </div>
         </li>
       </ul>
@@ -136,9 +139,16 @@
 
     <div class="block">
       <f7-button large class="glass-btn" @click="buscarActualizacion" :disabled="actualizando">
-        {{ actualizando ? 'Actualizando…' : 'Actualizar app' }}
+        {{ actualizando ? 'Buscando…' : 'Actualizar app' }}
       </f7-button>
       <div class="update-hint">Trae la última versión sin reinstalar la PWA.</div>
+    </div>
+
+    <div class="block">
+      <f7-button large class="glass-btn" color="orange" @click="confirmarReinstalar" :disabled="actualizando">
+        Reinstalar app
+      </f7-button>
+      <div class="update-hint">Solo si "Actualizar app" no resuelve un problema. Puede pedirte activar las notificaciones de nuevo; tus vueltas pendientes sin sincronizar no se pierden.</div>
     </div>
 
     <div class="block">
@@ -154,6 +164,7 @@ import { api } from '@/js/api.js';
 import { store, limpiarSesion } from '@/js/store.js';
 import { estadoPush, activarPush, desactivarPush } from '@/js/push.js';
 import { TEMATICAS, COLORES, tematicaActual, colorActual, aplicarTematica, aplicarColor } from '@/js/tema.js';
+import { estadoActualizacion, comprobarActualizacion, aplicarActualizacion, reinstalarApp } from '@/js/actualizacion.js';
 
 const usuario = computed(() => store.usuario ?? { nombre: '', rol: '', usuario: '', vehiculo: '', ruta: '' });
 const version = __APP_VERSION__ || '0.1.0';
@@ -261,22 +272,40 @@ function salir() {
   });
 }
 
-// Con registerType:'autoUpdate' el SW ya se actualiza solo (skipWaiting +
-// clientsClaim en vite.config.js): no hace falta desregistrarlo ni borrar
-// las cachés a mano —eso incluso podía dejar al chofer sin SW por un
-// instante—. reg.update() sólo pide al navegador revisar si hay un sw.js
-// nuevo; si lo hay, se activa solo y la recarga trae ya lo último.
+// registerType:'prompt' (vite.config.js) deja un SW nuevo "esperando" en vez
+// de activarlo solo: así se puede avisar de verdad si hay o no una versión
+// nueva, en vez de recargar a ciegas cada vez que se toca el botón (que es lo
+// que pasaba antes). Nunca desregistra el SW ni borra cachés — ver
+// reinstalarApp() para ese camino, aparte y con aviso previo.
 async function buscarActualizacion() {
   if (actualizando.value) return;
   actualizando.value = true;
   f7.toast.create({ text: 'Buscando actualización…', position: 'center', closeTimeout: 4000 }).open();
 
   try {
-    const reg = await navigator.serviceWorker?.getRegistration();
-    await reg?.update();
-  } catch { /* si falla la revisión, igual recargamos con lo que haya */ }
+    const hay = await comprobarActualizacion();
+    if (hay) {
+      // aplicarActualizacion() recarga sola en cuanto el SW nuevo toma el control.
+      await aplicarActualizacion();
+    } else {
+      f7.toast.create({ text: `Ya tienes la última versión (build ${buildId})`, closeTimeout: 2400, position: 'center' }).open();
+    }
+  } catch {
+    f7.toast.create({ text: 'No se pudo comprobar. Intenta de nuevo.', closeTimeout: 2200, position: 'center' }).open();
+  } finally {
+    actualizando.value = false;
+  }
+}
 
-  location.reload();
+// Camino aparte y explícito: sí desregistra el service worker y borra
+// cachés (nunca la cola offline, que vive en IndexedDB). Se avisa antes
+// porque puede pedir reactivar notificaciones.
+function confirmarReinstalar() {
+  f7.dialog.confirm(
+    'Vuelve a preparar la app desde cero en este dispositivo. Puede que tengas que activar otra vez las notificaciones. Tus vueltas pendientes sin sincronizar no se pierden.',
+    'Reinstalar app',
+    () => reinstalarApp()
+  );
 }
 
 onMounted(async () => {
@@ -340,4 +369,9 @@ onMounted(async () => {
 .perfil-email { opacity: 0.45; font-size: 12px; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; }
 .dato-icono { font-size: 26px; color: var(--inova-primary); }
 .update-hint { text-align: center; font-size: 13px; opacity: 0.55; margin-top: 10px; }
+.badge-nuevo {
+  display: inline-flex; align-items: center; margin-left: 6px;
+  font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 999px;
+  background: rgba(48, 209, 88, 0.18); color: #1f8a3d;
+}
 </style>

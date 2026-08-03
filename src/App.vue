@@ -106,6 +106,15 @@ onMounted(async () => {
     // Si este dispositivo ya tiene notificaciones activas, lo (re)registra para
     // el usuario actual — así al cambiar de teléfono sigue recibiendo push.
     sincronizarPush();
+    // Tras un "Reinstalar app" (actualizacion.js) el service worker es
+    // nuevo y la suscripción push anterior puede no haber sobrevivido: se
+    // vuelve a intentar explícitamente, una sola vez.
+    try {
+      if (localStorage.getItem('inovatrack_recien_reinstalado')) {
+        localStorage.removeItem('inovatrack_recien_reinstalado');
+        sincronizarPush();
+      }
+    } catch { /* modo privado */ }
     // Lo que quedó pendiente de una sesión anterior sin señal se manda ahora.
     flushCola();
     // Los motivos de no entrega se guardan en memoria desde el arranque: si no,
