@@ -233,6 +233,12 @@ async function arrancarCamara() {
   }
 }
 
+// El folio de las facturas de Crystal Reports va en Code 39 (fuente
+// Code39AzaleaWide3). Se prioriza ese formato y se acompaña de otros comunes
+// por si algún reporte usa otro; restringir la lista hace la lectura más
+// rápida y menos propensa a falsos positivos que el "multiformato" abierto.
+const FORMATOS_NATIVO = ['code_39', 'code_128', 'itf', 'ean_13', 'qr_code'];
+
 async function escanearConNativo() {
   const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
   const v = video.value;
@@ -240,7 +246,15 @@ async function escanearConNativo() {
   v.srcObject = stream;
   await v.play();
   controles = { stop: () => stream.getTracks().forEach((t) => t.stop()) };
-  const detector = new window.BarcodeDetector();
+  // Sólo los formatos que el navegador soporte de verdad (algunos no traen
+  // code_39); si la consulta falla, se deja que detecte todo.
+  let formats = FORMATOS_NATIVO;
+  try {
+    const soportados = await window.BarcodeDetector.getSupportedFormats();
+    const f = FORMATOS_NATIVO.filter((x) => soportados.includes(x));
+    if (f.length) formats = f;
+  } catch { /* usamos la lista completa */ }
+  const detector = new window.BarcodeDetector({ formats });
   const loop = async () => {
     if (paso.value !== 'escaner' || !v.srcObject) return;
     try {
@@ -254,8 +268,18 @@ async function escanearConNativo() {
 
 async function escanearConZxing() {
   // Import diferido: sólo el chofer que abre el escáner descarga la librería.
-  const { BrowserMultiFormatReader } = await import('@zxing/browser');
-  lector = new BrowserMultiFormatReader();
+  const [{ BrowserMultiFormatReader }, { DecodeHintType, BarcodeFormat }] = await Promise.all([
+    import('@zxing/browser'),
+    import('@zxing/library'),
+  ]);
+  // Prioriza Code 39 (el de las facturas) e insiste más en cada fotograma.
+  const hints = new Map();
+  hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+    BarcodeFormat.CODE_39, BarcodeFormat.CODE_128, BarcodeFormat.ITF,
+    BarcodeFormat.EAN_13, BarcodeFormat.QR_CODE,
+  ]);
+  hints.set(DecodeHintType.TRY_HARDER, true);
+  lector = new BrowserMultiFormatReader(hints);
   controles = await lector.decodeFromVideoDevice(undefined, video.value, (resultado) => {
     if (resultado) onCodigo(resultado.getText());
   });
