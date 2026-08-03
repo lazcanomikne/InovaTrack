@@ -99,19 +99,31 @@ export async function registrarHistorial(client, {
 /* --------------------------- Consulta de día -------------------------- */
 const SELECT_VUELTA = `
   SELECT v.*,
+         u.nombre AS chofer_nombre,
          (SELECT COUNT(*) FROM vuelta_evidencias e WHERE e.vuelta_id = v.id) AS evidencias,
          (SELECT COUNT(*) FROM vuelta_partidas p WHERE p.vuelta_id = v.id)  AS partidas
-  FROM vueltas v`;
+  FROM vueltas v
+  LEFT JOIN usuarios u ON u.id = v.chofer_id`;
 
-export async function vueltasDelDia(usuario, fecha) {
-  const soloMias = !esOficina(usuario);
+/**
+ * Vueltas de un día. Un chofer queda siempre acotado a las suyas; la oficina
+ * y la dirección ven las de todos y pueden acotar a uno con `choferId`
+ * (Módulo 1: la administración necesita revisar la ruta de cada quien).
+ */
+export function filtroChofer(usuario, choferId) {
+  if (!esOficina(usuario)) return Number(usuario.id);
+  return choferId ? Number(choferId) : null;
+}
+
+export async function vueltasDelDia(usuario, fecha, choferId = null) {
+  const soloDe = filtroChofer(usuario, choferId);
   const { rows } = await db().execute({
     sql: `${SELECT_VUELTA}
-          WHERE v.fecha = ? ${soloMias ? 'AND v.chofer_id = ?' : ''}
+          WHERE v.fecha = ? ${soloDe ? 'AND v.chofer_id = ?' : ''}
           ORDER BY
             CASE v.estado WHEN 'pendiente' THEN 0 WHEN 'revision' THEN 1 ELSE 2 END,
             v.orden, v.id`,
-    args: soloMias ? [fecha, usuario.id] : [fecha],
+    args: soloDe ? [fecha, soloDe] : [fecha],
   });
   return rows;
 }
@@ -132,16 +144,16 @@ export function contar(vueltas) {
  * Carga de cada día para la barra de calendario (Módulo 6): cuántas vueltas
  * siguen abiertas por fecha. Es lo que hace visible el "arrastre" a futuro.
  */
-export async function cargaPorDia(usuario, desde, hasta) {
-  const soloMias = !esOficina(usuario);
+export async function cargaPorDia(usuario, desde, hasta, choferId = null) {
+  const soloDe = filtroChofer(usuario, choferId);
   const { rows } = await db().execute({
     sql: `SELECT fecha, COUNT(*) AS abiertas
           FROM vueltas
           WHERE fecha BETWEEN ? AND ?
             AND estado IN ('pendiente','revision')
-            ${soloMias ? 'AND chofer_id = ?' : ''}
+            ${soloDe ? 'AND chofer_id = ?' : ''}
           GROUP BY fecha`,
-    args: soloMias ? [desde, hasta, usuario.id] : [desde, hasta],
+    args: soloDe ? [desde, hasta, soloDe] : [desde, hasta],
   });
   return Object.fromEntries(rows.map((r) => [r.fecha, Number(r.abiertas)]));
 }

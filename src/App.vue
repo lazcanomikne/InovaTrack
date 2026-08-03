@@ -12,6 +12,7 @@
            su entrada en `tabs` (abajo), con la misma convención id="view-<id>". -->
       <f7-views tabs class="safe-areas">
         <f7-view id="view-vueltas" main tab tab-active url="/" />
+        <f7-view v-if="esAdmin" id="view-admin" tab url="/admin/" />
         <f7-view id="view-perfil" tab url="/perfil/" />
       </f7-views>
 
@@ -71,11 +72,16 @@ const f7params = reactive({
 // 'captura' es un caso especial: NO tiene <f7-view> propia, es una acción
 // (abrir la captura de vuelta manual en Mis vueltas), no un tab. show()
 // la trata aparte antes de intentar cambiar de vista.
-const tabs = [
+// El engrane sólo existe para oficina/dirección. El backend revalida el rol en
+// cada llamada: esconderlo aquí es comodidad, no seguridad.
+const esAdmin = computed(() => ['oficina', 'direccion'].includes(store.usuario?.rol));
+
+const tabs = computed(() => [
   { id: 'vueltas', label: 'Mis vueltas', icon: 'square_list_fill' },
   { id: 'captura', label: 'Nueva', icon: 'plus' },
+  ...(esAdmin.value ? [{ id: 'admin', label: 'Config', icon: 'gear_alt_fill' }] : []),
   { id: 'perfil', label: 'Perfil', icon: 'person_fill' },
-];
+]);
 
 const active = ref('vueltas');
 

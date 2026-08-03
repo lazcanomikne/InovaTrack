@@ -20,7 +20,7 @@ export default async function handler(req, res) {
 
   /* ------------------------------- GET ------------------------------- */
   if (req.method === 'GET') {
-    const { fecha, desde, hasta, folio } = req.query ?? {};
+    const { fecha, desde, hasta, folio, chofer_id: choferId } = req.query ?? {};
 
     // ── Escaneo: resolver folio y validar antes de crear nada ──
     if (folio) {
@@ -71,12 +71,12 @@ export default async function handler(req, res) {
     // ── Carga por día para la barra de calendario ──
     if (desde && hasta) {
       if (!esFechaValida(desde) || !esFechaValida(hasta)) return sendError(res, 'Fechas inválidas');
-      return sendJson(res, { carga: await cargaPorDia(sesion, desde, hasta) });
+      return sendJson(res, { carga: await cargaPorDia(sesion, desde, hasta, choferId) });
     }
 
     // ── Vueltas de un día ──
     const dia = esFechaValida(fecha) ? fecha : hoyMx();
-    const vueltas = await vueltasDelDia(sesion, dia);
+    const vueltas = await vueltasDelDia(sesion, dia, choferId);
     return sendJson(res, {
       fecha: dia,
       hoy: hoyMx(),

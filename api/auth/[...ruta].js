@@ -191,7 +191,10 @@ export default async function handler(req, res) {
         // Los datos de operación se leen frescos: la oficina puede cambiar el
         // vehículo o la ruta sin que el chofer tenga que volver a entrar.
         const { rows } = await db().execute({
-          sql: 'SELECT avatar, usuario, vehiculo, ruta, activo FROM usuarios WHERE id = ?',
+          // `rol` también se relee: viaja dentro del JWT, que dura 30 días, así
+          // que sin esto un cambio de rol desde el panel no surtiría efecto
+          // hasta que la persona volviera a entrar.
+          sql: 'SELECT avatar, usuario, vehiculo, ruta, activo, rol FROM usuarios WHERE id = ?',
           args: [u.id],
         });
         const d = rows[0];
@@ -203,6 +206,7 @@ export default async function handler(req, res) {
         return sendJson(res, {
           usuario: {
             ...u,
+            rol: d.rol ?? u.rol,
             avatar: d.avatar ?? null,
             usuario: d.usuario ?? null,
             vehiculo: d.vehiculo ?? null,

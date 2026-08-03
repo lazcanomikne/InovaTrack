@@ -45,9 +45,10 @@ export const api = {
   // ── Vueltas (reparto) ─────────────────────────────────────────────────
   vueltas: {
     // Vueltas de un día + contadores.
-    dia: (fecha) => request(`/vueltas?fecha=${fecha}`),
+    // `choferId` sólo lo respeta el servidor para oficina/dirección.
+    dia: (fecha, choferId) => request(`/vueltas?fecha=${fecha}${choferId ? `&chofer_id=${choferId}` : ''}`),
     // Carga por día para la barra de calendario.
-    carga: (desde, hasta) => request(`/vueltas?desde=${desde}&hasta=${hasta}`),
+    carga: (desde, hasta, choferId) => request(`/vueltas?desde=${desde}&hasta=${hasta}${choferId ? `&chofer_id=${choferId}` : ''}`),
     // Escaneo: resuelve el folio y aplica las validaciones del Módulo 2.
     escanear: (folio) => request(`/vueltas?folio=${encodeURIComponent(folio)}`),
     crear: (body) => request('/vueltas', { method: 'POST', body }),
@@ -74,6 +75,10 @@ export const api = {
   usuarios: {
     list: () => request('/usuarios'),
     actualizar: (body) => request('/usuarios', { method: 'PATCH', body }),
+    // Administración (oficina/dirección). `editar` manda el id del objetivo:
+    // sin id, el servidor entiende que es el perfil propio.
+    crear: (body) => request('/usuarios', { method: 'POST', body }),
+    editar: (id, body) => request('/usuarios', { method: 'PATCH', body: { id, ...body } }),
   },
   push: {
     llavePublica: () => request('/push'),
