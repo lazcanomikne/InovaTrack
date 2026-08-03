@@ -6,13 +6,20 @@
         <i class="f7-icons">chevron_left</i>
       </button>
 
-      <div class="dias">
+      <div
+        class="dias"
+        @pointerdown="iniciarSwipe"
+        @pointermove="moverSwipe"
+        @pointerup="terminarSwipe"
+        @pointercancel="cancelarSwipe"
+      >
         <button
-          v-for="d in diasVisibles"
+          v-for="(d, i) in diasVisibles"
           :key="d.fecha"
           type="button"
           class="dia"
           :class="{ sel: d.fecha === fecha, hoy: d.fecha === hoyStr, pasado: d.fecha < hoyStr }"
+          :style="estiloDia(d, i)"
           @click="irA(d.fecha)"
         >
           <span class="dia-semana">{{ d.semana }}</span>
@@ -142,6 +149,7 @@ import { f7 } from 'framework7-vue';
 import { api } from '@/js/api.js';
 import { store, setMotivos } from '@/js/store.js';
 import * as cola from '@/js/cola.js';
+import * as haptics from '@/js/haptics.js';
 import {
   hoy, sumarDias, partesFecha, etiquetaFecha, horaCorta,
   estadoInfo, estaAbierta, esCritica, tituloVuelta, direccionCorta, coincide, contarLocal,
@@ -172,6 +180,65 @@ const diasVisibles = computed(() =>
     return { fecha: f, ...partesFecha(f), abiertas: carga.value[f] ?? 0 };
   })
 );
+
+/* ------------------------- Barra en corona -------------------------- */
+// La curvatura de cada botón se calcula sólo a partir de su distancia al
+// centro (índice 2 de los 5 visibles): nada de valores fijos por día. El
+// arrastre en curso (dx) se suma como una fracción de "paso" para que la
+// corona siga al dedo antes de asentarse en el día definitivo.
+const UMBRAL_SWIPE = 46;   // px para confirmar el cambio de día al soltar
+const PASO_ARRASTRE = 90;  // px de arrastre ≈ un paso completo de la corona
+const dx = ref(0);
+let swipeActivo = false;
+let punteroId = null;
+let inicioX = 0;
+
+function reduceMovimiento() {
+  return typeof window !== 'undefined' &&
+    !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+}
+
+function estiloDia(d, i) {
+  const offsetArrastre = reduceMovimiento() ? 0 : dx.value / PASO_ARRASTRE;
+  const offset = Math.min(2.6, Math.max(-2.6, (i - 2) + offsetArrastre));
+  const distancia = Math.abs(offset);
+  const seleccionado = d.fecha === fecha.value;
+  const angulo = offset * 13;
+  const bajada = offset * offset * 3.4;
+  const escala = Math.max(0.78, 1 - distancia * 0.07) * (seleccionado ? 1.08 : 1);
+  const opacidad = Math.max(0.45, 1 - distancia * 0.12);
+  return {
+    transform: `translateY(${bajada}px) rotate(${angulo}deg) scale(${escala})`,
+    opacity: opacidad,
+  };
+}
+
+function iniciarSwipe(e) {
+  if (e.pointerType === 'mouse' && e.button !== 0) return;
+  swipeActivo = true;
+  punteroId = e.pointerId;
+  inicioX = e.clientX;
+  dx.value = 0;
+}
+
+function moverSwipe(e) {
+  if (!swipeActivo || e.pointerId !== punteroId) return;
+  dx.value = e.clientX - inicioX;
+}
+
+function terminarSwipe(e) {
+  if (!swipeActivo || e.pointerId !== punteroId) return;
+  swipeActivo = false;
+  const delta = dx.value;
+  dx.value = 0;
+  if (delta <= -UMBRAL_SWIPE) irA(sumarDias(fecha.value, 1));
+  else if (delta >= UMBRAL_SWIPE) irA(sumarDias(fecha.value, -1));
+}
+
+function cancelarSwipe() {
+  swipeActivo = false;
+  dx.value = 0;
+}
 
 /* ------------------------------ Datos ------------------------------ */
 // Recalcula contadores y guarda la vuelta ya mutada, sin esperar al servidor.
@@ -218,6 +285,7 @@ async function cargarBarra() {
 }
 
 function irA(f) {
+  haptics.tap();
   fecha.value = f;
   ancla.value = f;
   busqueda.value = '';
@@ -357,7 +425,10 @@ onMounted(cargar);
 </script>
 
 <style scoped>
-/* ---------------- Barra de días ---------------- */
+/* ---------------- Barra de días: corona ---------------- */
+/* El arco no está "dibujado": cada .dia recibe su transform por JS
+   (estiloDia), calculado sólo a partir de su distancia al centro. Aquí sólo
+   van el contenedor, la transición y el estado visual de cada botón. */
 .barra-dias {
   position: sticky;
   top: 0;
@@ -365,31 +436,42 @@ onMounted(cargar);
   display: flex;
   align-items: center;
   gap: 2px;
-  padding: calc(6px + env(safe-area-inset-top)) 6px 8px;
-  border-radius: 0 0 20px 20px;
+  padding: calc(10px + env(safe-area-inset-top)) 6px 14px;
+  border-radius: 0 0 30px 30px;
+  box-shadow: var(--glass-shadow);
+  border-bottom: 1px solid var(--glass-border);
 }
 .dia-nav {
   border: none; background: transparent; color: inherit; opacity: 0.35;
   width: 30px; height: 54px; cursor: pointer; flex-shrink: 0;
 }
 .dia-nav i { font-size: 20px; }
-.dias { flex: 1; display: flex; justify-content: space-around; gap: 2px; }
+.dias {
+  flex: 1; display: flex; justify-content: space-around; gap: 2px;
+  /* Deja el scroll vertical de la página libre; el arrastre horizontal
+     de esta barra lo captura el pointerdown/move/up en JS. */
+  touch-action: pan-y;
+}
 
 .dia {
   flex: 1;
   border: none; background: transparent; color: inherit;
   display: flex; flex-direction: column; align-items: center; gap: 1px;
   padding: 6px 2px 5px; border-radius: 14px; cursor: pointer;
-  transition: background 0.15s ease, transform 0.12s ease;
+  transform-origin: bottom center;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .dia { transition: background 0.15s ease, transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.22s ease; }
 }
 .dia-semana { font-size: 10px; opacity: 0.5; text-transform: capitalize; }
 .dia-num { font-size: 19px; font-weight: 700; line-height: 1.1; }
 .dia.pasado .dia-num { opacity: 0.45; }
 .dia.hoy .dia-num { color: var(--inova-primary); }
-/* El día seleccionado va más grande y con fondo, como pide el Módulo 6. */
+/* El día seleccionado va más grande y con fondo, como pide el Módulo 6.
+   El tamaño real (escala) lo agrega estiloDia() en el mismo transform que
+   la curvatura, para no pelear con dos reglas de `transform` distintas. */
 .dia.sel {
   background: linear-gradient(135deg, var(--inova-primary), var(--inova-primary-2));
-  transform: scale(1.06);
 }
 .dia.sel .dia-semana, .dia.sel .dia-num { color: #fff; opacity: 1; }
 .dia.sel .dia-num { font-size: 22px; }
