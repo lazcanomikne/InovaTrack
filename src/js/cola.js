@@ -57,11 +57,19 @@ export async function encolar({ tipo, vuelta_id = null, payload = {}, client_uui
     }
   }
 
+  // Red de seguridad: IndexedDB clona el payload con structuredClone y los
+  // Proxies reactivos de Vue (p. ej. las partidas de una factura) no son
+  // clonables (DataCloneError). Todo lo que no sea 'evidencia' viaja como JSON
+  // al servidor, así que normalizarlo a datos planos es inocuo y evita esa
+  // clase de error. La 'evidencia' se deja intacta porque lleva un Blob, que
+  // sí es clonable pero no sobrevive a JSON.
+  const payloadPlano = tipo === 'evidencia' ? payload : JSON.parse(JSON.stringify(payload));
+
   const entrada = {
     tipo,
     client_uuid: client_uuid ?? crypto.randomUUID(),
     vuelta_id,
-    payload,
+    payload: payloadPlano,
     estado: 'pendiente',
     intentos: 0,
     ultimo_error: null,

@@ -225,13 +225,18 @@ function pasaFiltro(v) {
   return true;
 }
 
-// Reordenar sobre una lista recortada movería posiciones que no se ven, así
-// que sólo se permite con la lista completa.
+// Se puede reordenar con la lista completa ("Todo") o con el filtro de
+// "Pendientes" —que es como el chofer arma su ruta del día—. Con "Entregadas"
+// o "No entreg." no tiene sentido, y con una búsqueda activa tampoco (se
+// verían huecos). El reordenamiento respeta el subconjunto visible y deja en
+// su lugar lo que no se ve (ver moverArrastre).
+const esVisible = (v) => coincide(v, busqueda.value) && pasaFiltro(v);
+const filtradas = computed(() => vueltas.value.filter(esVisible));
 const puedeReordenar = computed(
-  () => !soloLectura.value && !busqueda.value && filtro.value === 'todo' && vueltas.value.length > 1
+  () => !soloLectura.value && !busqueda.value
+    && (filtro.value === 'todo' || filtro.value === 'pendientes')
+    && filtradas.value.length > 1
 );
-
-const filtradas = computed(() => vueltas.value.filter((v) => coincide(v, busqueda.value) && pasaFiltro(v)));
 
 // 5 días: 2 antes, el ancla al centro, 2 después.
 const diasVisibles = computed(() =>
@@ -414,11 +419,17 @@ function moverArrastre(e) {
   e.preventDefault(); // no dejar que la página haga scroll mientras se arrastra
   const sobre = idxBajoElDedo(e.clientY);
   if (sobre === null || sobre === desdeIdx) return;
+  // Los índices (data-idx) son sobre la lista VISIBLE (filtradas). Se reordena
+  // ese subconjunto y se reconstruye la lista completa: los ítems que el
+  // filtro oculta conservan su posición; los visibles toman el orden nuevo.
+  // Así reordenar dentro de "Pendientes" no descoloca las ya cerradas.
+  const vis = [...filtradas.value];
+  if (sobre >= vis.length) return;
   huboMovimiento = true;
-  const arr = [...vueltas.value];
-  const [m] = arr.splice(desdeIdx, 1);
-  arr.splice(sobre, 0, m);
-  vueltas.value = arr;
+  const [m] = vis.splice(desdeIdx, 1);
+  vis.splice(sobre, 0, m);
+  let k = 0;
+  vueltas.value = vueltas.value.map((item) => (esVisible(item) ? vis[k++] : item));
   desdeIdx = sobre;
   haptics.tap();
 }

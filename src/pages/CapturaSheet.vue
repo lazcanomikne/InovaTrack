@@ -341,7 +341,14 @@ function confirmarFactura() {
     contacto: fa.contacto ?? null,
     telefono: fa.telefono ?? null,
     direccion: fa.direccion ?? null,
-    partidas: fa.partidas ?? [],
+    // `fa.partidas` es un array REACTIVO de Vue (Proxy); IndexedDB no puede
+    // clonar Proxies (DataCloneError al encolar). Se copia a objetos planos.
+    partidas: (fa.partidas ?? []).map((p) => ({
+      articulo: p.articulo ?? null,
+      descripcion: p.descripcion ?? null,
+      cantidad: p.cantidad ?? null,
+      bultos: p.bultos ?? null,
+    })),
   });
   cerrar();
 }
