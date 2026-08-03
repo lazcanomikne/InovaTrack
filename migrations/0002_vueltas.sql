@@ -21,6 +21,9 @@
 -- 4. MULTI-CHOFER DESDE FASE 1. `chofer_id` en cada vuelta y actor en cada
 --    movimiento del historial: el panel de oficina (fase 2) no requiere migrar
 --    datos, sólo leerlos.
+--
+-- OJO: este script es destructivo (DROP) sobre sus propias tablas.
+-- migrate:destructivo
 
 DROP TABLE IF EXISTS vuelta_historial;
 DROP TABLE IF EXISTS vuelta_evidencias;

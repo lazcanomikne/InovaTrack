@@ -5,6 +5,7 @@
 -- aparte (0002_<modulo>.sql, etc.) para no volver a tocar este archivo.
 --
 -- OJO: este script es destructivo (DROP). Sólo para inicializar la base.
+-- migrate:destructivo
 
 DROP TABLE IF EXISTS push_subs;
 DROP TABLE IF EXISTS retos_webauthn;

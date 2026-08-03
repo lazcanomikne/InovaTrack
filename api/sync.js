@@ -23,7 +23,7 @@ import { db, sendJson, sendError, readBody } from './_db.js';
 import { requiereSesion } from './_auth.js';
 import {
   vueltaDe, crearVuelta, cerrarVuelta, reprogramarVuelta, reordenar,
-  registrarHistorial, puedeEditar, ABIERTOS,
+  registrarHistorial, puedeEditar, ABIERTOS, marcarConflicto,
 } from './_vueltas.js';
 
 const MAX_OPERACIONES = 200;
@@ -54,7 +54,14 @@ export default async function handler(req, res) {
       const r = await aplicar(client, op, sesion);
       resultados.push({ client_uuid: uuid, ok: true, ...r });
     } catch (e) {
-      // Un fallo no detiene el resto: se reporta y se sigue.
+      // Un fallo no detiene el resto: se reporta y se sigue. Si es un
+      // conflicto sobre una vuelta identificable, además se cierra el
+      // círculo: queda en 'revision' con el motivo, no sólo en la respuesta.
+      if (e.conflicto && e.vuelta_id) {
+        try {
+          await marcarConflicto({ vuelta_id: e.vuelta_id, mensaje: e.message, actor_id: sesion.id });
+        } catch { /* la respuesta ya trae el conflicto igual; no tumbar el lote por esto */ }
+      }
       resultados.push({
         client_uuid: uuid,
         ok: false,
@@ -67,10 +74,16 @@ export default async function handler(req, res) {
   return sendJson(res, { resultados, servidor_hora: new Date().toISOString() });
 }
 
-/** Marca un error como conflicto (la app pondrá la vuelta en revisión). */
-function conflicto(mensaje) {
+/**
+ * Marca un error como conflicto. Cuando hay una vuelta identificable de por
+ * medio, el handler la deja en 'revision' (marcarConflicto en _vueltas.js);
+ * si no la hay —como al rechazar un 'crear' porque la factura ya es de otro
+ * chofer— no hay ninguna vuelta propia que marcar, sólo se reporta.
+ */
+function conflicto(mensaje, vuelta_id = null) {
   const e = new Error(mensaje);
   e.conflicto = true;
+  e.vuelta_id = vuelta_id;
   return e;
 }
 
@@ -119,10 +132,10 @@ async function aplicar(client, op, sesion) {
   if (!Number.isFinite(vueltaId)) throw new Error('Falta vuelta_id');
 
   const vuelta = await vueltaDe(vueltaId, sesion);
-  if (!vuelta) throw conflicto('La vuelta ya no está asignada a ti.');
+  if (!vuelta) throw conflicto('La vuelta ya no está asignada a ti.', vueltaId);
 
   if (!puedeEditar(vuelta, { desdeCola: true })) {
-    throw conflicto('Esa vuelta pertenece a un día ya cerrado.');
+    throw conflicto('Esa vuelta pertenece a un día ya cerrado.', vueltaId);
   }
 
   if (tipo === 'entregar' || tipo === 'no_entregar') {
@@ -130,18 +143,18 @@ async function aplicar(client, op, sesion) {
       ...op,
       estado: tipo === 'entregar' ? 'entregada' : 'no_entregada',
     }, sesion);
-    if (r.error) throw conflicto(r.error);
+    if (r.error) throw conflicto(r.error, vueltaId);
     return { estado: r.sinCambio ? 'duplicada' : 'cerrada', vuelta_id: vueltaId };
   }
 
   if (tipo === 'reprogramar') {
     const r = await reprogramarVuelta(vuelta, op, sesion);
-    if (r.error) throw conflicto(r.error);
+    if (r.error) throw conflicto(r.error, vueltaId);
     return { estado: r.duplicada ? 'duplicada' : 'reprogramada', vuelta_id: vueltaId, hija_id: r.hija?.id };
   }
 
   if (tipo === 'editar') {
-    if (!ABIERTOS.includes(vuelta.estado)) throw conflicto('La vuelta ya está cerrada.');
+    if (!ABIERTOS.includes(vuelta.estado)) throw conflicto('La vuelta ya está cerrada.', vueltaId);
     const campos = EDITABLES.filter((c) => c in op);
     if (!campos.length) return { estado: 'sin_cambio', vuelta_id: vueltaId };
     await client.execute({
